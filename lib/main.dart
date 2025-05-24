@@ -7,19 +7,19 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await WordDatabase.loadWords();
-  runApp(const MrWhiteApp());
+  runApp(const ImpeterApp());
 }
 
-class MrWhiteApp extends StatefulWidget {
-  const MrWhiteApp({super.key});
+class ImpeterApp extends StatefulWidget {
+  const ImpeterApp({super.key});
 
   @override
-  _MrWhiteAppState createState() => _MrWhiteAppState();
+  _ImpeterAppState createState() => _ImpeterAppState();
 }
 
-class _MrWhiteAppState extends State<MrWhiteApp> {
+class _ImpeterAppState extends State<ImpeterApp> {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  static _MrWhiteAppState? _instance;
+  static _ImpeterAppState? _instance;
 
   @override
   void initState() {
@@ -37,7 +37,7 @@ class _MrWhiteAppState extends State<MrWhiteApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Mr. White',
+      title: 'Impeter',
       theme: ThemeData(
         primarySwatch: Colors.deepPurple,
         visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -121,6 +121,7 @@ class _MrWhiteAppState extends State<MrWhiteApp> {
 // Datenmodelle
 class GameSettings {
   int playerCount = 5;
+  int impeterCount = 1;
   int roundCount = 1;
   int timerMinutes = 0;
   String language = 'de';
@@ -133,6 +134,8 @@ class GameSettings {
   static GameSettings instance = GameSettings();
 
   Map<String, String> get texts => language == 'de' ? germanTexts : englishTexts;
+  
+  int get maxImpeters => (playerCount / 3).floor().clamp(1, playerCount - 1);
 }
 
 enum GameMode { classic, places, words }
@@ -201,14 +204,14 @@ class FadePageRoute<T> extends PageRouteBuilder<T> {
 
 class Player {
   String name;
-  bool isImposter;
+  bool isImpeter;
   bool isEliminated;
   int voteCount;
   int wins;
 
   Player({
     required this.name,
-    this.isImposter = false,
+    this.isImpeter = false,
     this.isEliminated = false,
     this.voteCount = 0,
     this.wins = 0,
@@ -358,7 +361,7 @@ class WordDatabase {
 
 // Übersetzungen
 const Map<String, String> germanTexts = {
-  'homeTitle': 'Mr. White',
+  'homeTitle': 'Impeter',
   'startGame': 'Neues Spiel',
   'settings': 'Einstellungen',
   'playerSetup': 'Spieler hinzufügen',
@@ -367,16 +370,16 @@ const Map<String, String> germanTexts = {
   'remove': 'Entfernen',
   'startRound': 'Spiel starten',
   'roleReveal': 'Rolle enthüllen',
-  'youAreImposter': 'Du bist der Impostor!',
-  'youAreNot': 'Du bist kein Impostor. Wort:',
+  'youAreImpeter': 'Du bist der Impeter!',
+  'youAreNot': 'Du bist kein Impeter. Wort:',
   'next': 'Weiter',
   'discussion': 'Diskussion',
   'vote': 'Abstimmung',
   'confirm': 'Bestätigen',
   'results': 'Ergebnis',
   'eliminated': 'wurde eliminiert!',
-  'wasImposter': 'Er war der Impostor!',
-  'wasNotImposter': 'Er war nicht der Impostor!',
+  'wasImpeter': 'Er war der Impeter!',
+  'wasNotImpeter': 'Er war nicht der Impeter!',
   'nextRound': 'Nächste Runde',
   'gameOver': 'Spiel vorbei',
   'finalResults': 'Das Spiel ist zu Ende.',
@@ -401,11 +404,12 @@ const Map<String, String> germanTexts = {
   'tapToReveal': 'Tippe zum Aufdecken',
   'addCustomWord': 'Eigenes Wort hinzufügen',
   'customWordsList': 'Eigene Wörter',
-  'deleteWord': 'Wort löschen'
+  'deleteWord': 'Wort löschen',
+  'impeterCount': 'Anzahl Impeter'
 };
 
 const Map<String, String> englishTexts = {
-  'homeTitle': 'Mr. White',
+  'homeTitle': 'Impeter',
   'startGame': 'New Game',
   'settings': 'Settings',
   'playerSetup': 'Add Players',
@@ -414,16 +418,16 @@ const Map<String, String> englishTexts = {
   'remove': 'Remove',
   'startRound': 'Start Game',
   'roleReveal': 'Reveal Role',
-  'youAreImposter': 'You are the Imposter!',
-  'youAreNot': 'You are not the Imposter. Word:',
+  'youAreImpeter': 'You are the Impeter!',
+  'youAreNot': 'You are not the Impeter. Word:',
   'next': 'Next',
   'discussion': 'Discussion',
   'vote': 'Vote',
   'confirm': 'Confirm',
   'results': 'Results',
   'eliminated': 'was eliminated!',
-  'wasImposter': 'They were the Imposter!',
-  'wasNotImposter': 'They were not the Imposter!',
+  'wasImpeter': 'They were the Impeter!',
+  'wasNotImpeter': 'They were not the Impeter!',
   'nextRound': 'Next Round',
   'gameOver': 'Game Over',
   'finalResults': 'The game has ended.',
@@ -448,7 +452,8 @@ const Map<String, String> englishTexts = {
   'tapToReveal': 'Tap to Reveal',
   'addCustomWord': 'Add Custom Word',
   'customWordsList': 'Custom Words',
-  'deleteWord': 'Delete Word'
+  'deleteWord': 'Delete Word',
+  'impeterCount': 'Impeter Count'
 };
 
 // Haupt-Screens
@@ -510,7 +515,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.deepPurple.shade100, Colors.white],
+            colors: Theme.of(context).brightness == Brightness.dark
+                ? [const Color(0xFF1E1E1E), const Color(0xFF121212)]
+                : [Colors.deepPurple.shade100, Colors.white],
           ),
         ),
         child: Center(
@@ -750,12 +757,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Slider(
                     min: 3,
-                    max: 10,
-                    divisions: 7,
+                    max: 30,
+                    divisions: 27,
                     value: settings.playerCount.toDouble(),
                     label: settings.playerCount.toString(),
                     onChanged: (v) => setState(() {
                       settings.playerCount = v.toInt();
+                      // Ensure impeter count doesn't exceed maximum
+                      if (settings.impeterCount > settings.maxImpeters) {
+                        settings.impeterCount = settings.maxImpeters;
+                      }
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${texts['impeterCount']} ${settings.impeterCount}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  Slider(
+                    min: 1,
+                    max: settings.maxImpeters.toDouble(),
+                    divisions: settings.maxImpeters > 1 ? settings.maxImpeters - 1 : null,
+                    value: settings.impeterCount.toDouble().clamp(1, settings.maxImpeters.toDouble()),
+                    label: settings.impeterCount.toString(),
+                    onChanged: (v) => setState(() {
+                      settings.impeterCount = v.toInt();
                     }),
                   ),
                 ],
@@ -894,7 +929,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         settings.isDarkMode = value;
                       });
                       // Rebuild the entire app to apply theme change
-                      _MrWhiteAppState.rebuildApp();
+                      _ImpeterAppState.rebuildApp();
                     },
                   ),
                 ],
@@ -913,7 +948,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   SwitchListTile(
                     title: Text(texts['showTips']!),
-                    subtitle: const Text('Imposter bekommt Hinweise zum Wort'),
+                    subtitle: const Text('Impeter bekommt Hinweise zum Wort'),
                     value: settings.showTips,
                     onChanged: (value) {
                       setState(() {
@@ -1022,7 +1057,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _loadPersistentPlayers();
+    // Only load persistent players if we're starting fresh (setup phase)
+    if (_gameData.phase == GamePhase.setup) {
+      _loadPersistentPlayers();
+    }
   }
 
   void _loadPersistentPlayers() {
@@ -1072,15 +1110,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     // Reset all players
     for (var p in _gameData.players) {
-      p.isImposter = false;
+      p.isImpeter = false;
       p.voteCount = 0;
       p.isEliminated = false;
     }
 
-    // Assign impostor
+    // Assign impeters
     final rand = Random();
-    int impIdx = rand.nextInt(_gameData.players.length);
-    _gameData.players[impIdx].isImposter = true;
+    final List<int> impeterIndices = [];
+    
+    // Randomly select impeters
+    while (impeterIndices.length < settings.impeterCount) {
+      int idx = rand.nextInt(_gameData.players.length);
+      if (!impeterIndices.contains(idx)) {
+        impeterIndices.add(idx);
+        _gameData.players[idx].isImpeter = true;
+      }
+    }
 
     // Select word with 25% chance for custom words if available, avoiding repeats
     List<String> standardPool;
@@ -1168,21 +1214,49 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     setState(() {
       eliminated.isEliminated = true;
       _gameData.phase = GamePhase.results;
-      
-      // Track win: if imposter eliminated, all non-imposters win, otherwise imposter wins
-      if (eliminated.isImposter) {
-        for (var player in _gameData.players.where((p) => !p.isImposter)) {
-          _gameData.addWinToPlayer(player.name);
-        }
-      } else {
-        final imposter = _gameData.players.firstWhere((p) => p.isImposter);
-        _gameData.addWinToPlayer(imposter.name);
-      }
     });
   }
 
+  bool _isGameOver() {
+    final activePlayers = _gameData.players.where((p) => !p.isEliminated).toList();
+    final activeImposters = activePlayers.where((p) => p.isImpeter).length;
+    final activeNonImposters = activePlayers.where((p) => !p.isImpeter).length;
+    
+    // Game over conditions:
+    // 1. No impeters left (non-impeters win)
+    // 2. No non-impeters left (impeters win) 
+    // 3. Impeters equal or outnumber non-impeters (impeters win)
+    return activeImposters == 0 || 
+           activeNonImposters == 0 || 
+           activeImposters >= activeNonImposters;
+  }
+
+  void _checkGameEnd() {
+    final activePlayers = _gameData.players.where((p) => !p.isEliminated).toList();
+    final activeImposters = activePlayers.where((p) => p.isImpeter).toList();
+    final activeNonImposters = activePlayers.where((p) => !p.isImpeter).toList();
+    
+    if (activeImposters.isEmpty) {
+      // Non-impeters win
+      for (var player in activeNonImposters) {
+        _gameData.addWinToPlayer(player.name);
+      }
+    } else if (activeNonImposters.isEmpty || activeImposters.length >= activeNonImposters.length) {
+      // Impeters win
+      for (var player in activeImposters) {
+        _gameData.addWinToPlayer(player.name);
+      }
+    }
+  }
+
   void _nextRound() {
-    if (_gameData.currentRound < GameSettings.instance.roundCount) {
+    if (_isGameOver()) {
+      _checkGameEnd();
+      Navigator.push(
+        context,
+        FadePageRoute(child: const FinalStatisticsScreen()),
+      );
+    } else if (_gameData.currentRound < GameSettings.instance.roundCount) {
       setState(() {
         _gameData.currentRound++;
         _gameData.phase = GamePhase.setup;
@@ -1192,6 +1266,30 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         context,
         FadePageRoute(child: const FinalStatisticsScreen()),
       );
+    }
+  }
+
+  void _continueGame() {
+    // Reset vote counts for next round but keep current word and roles
+    for (var player in _gameData.players) {
+      player.voteCount = 0;
+    }
+    
+    setState(() {
+      _gameData.phase = GamePhase.discussion;
+    });
+    
+    // Start discussion timer if enabled
+    if (GameSettings.instance.timerMinutes > 0) {
+      _gameData.remainingSeconds = GameSettings.instance.timerMinutes * 60;
+      _gameData.gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_gameData.remainingSeconds > 0) {
+          setState(() => _gameData.remainingSeconds--);
+        } else {
+          timer.cancel();
+          _startVoting();
+        }
+      });
     }
   }
 
@@ -1317,7 +1415,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: _isCardFlipped
-                ? (player.isImposter
+                ? (player.isImpeter
                     ? [Colors.red.shade100, Colors.red.shade50]
                     : [Colors.green.shade100, Colors.green.shade50])
                 : [Colors.deepPurple.shade100, Colors.deepPurple.shade50],
@@ -1418,7 +1516,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   Widget _buildRevealedCard(Player player, Map<String, String> texts, GameSettings settings) {
     String tipText = '';
-    if (settings.showTips && player.isImposter) {
+    if (settings.showTips && player.isImpeter) {
       tipText = WordDatabase.getTip(_gameData.currentWord);
     }
 
@@ -1433,7 +1531,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: player.isImposter
+            colors: player.isImpeter
                 ? [Colors.red.shade300, Colors.red.shade600]
                 : [Colors.green.shade300, Colors.green.shade600],
           ),
@@ -1444,14 +1542,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                player.isImposter ? Icons.warning : Icons.check_circle,
+                player.isImpeter ? Icons.warning : Icons.check_circle,
                 size: 40,
                 color: Colors.white,
               ),
               const SizedBox(height: 10),
               Text(
-                player.isImposter
-                    ? texts['youAreImposter']!
+                player.isImpeter
+                    ? texts['youAreImpeter']!
                     : '${texts['youAreNot']} ${_gameData.currentWord}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
@@ -1460,7 +1558,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   color: Colors.white,
                 ),
               ),
-              if (settings.showTips && player.isImposter && tipText.isNotEmpty) ...[
+              if (settings.showTips && player.isImpeter && tipText.isNotEmpty) ...[
                 const SizedBox(height: 15),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -1671,7 +1769,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,end: Alignment.bottomCenter,
-            colors: eliminated.isImposter
+            colors: eliminated.isImpeter
                 ? [Colors.green.shade100, Colors.green.shade50]
                 : [Colors.orange.shade100, Colors.orange.shade50],
           ),
@@ -1683,9 +1781,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  eliminated.isImposter ? Icons.check_circle : Icons.error,
+                  eliminated.isImpeter ? Icons.check_circle : Icons.error,
                   size: 80,
-                  color: eliminated.isImposter ? Colors.green : Colors.orange,
+                  color: eliminated.isImpeter ? Colors.green : Colors.orange,
                 ),
                 SizedBox(height: 20),
                 Card(
@@ -1701,45 +1799,36 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         ),
                         SizedBox(height: 10),
                         Text(
-                          eliminated.isImposter
-                              ? texts['wasImposter']!
-                              : texts['wasNotImposter']!,
+                          eliminated.isImpeter
+                              ? texts['wasImpeter']!
+                              : texts['wasNotImpeter']!,
                           style: TextStyle(
                             fontSize: 16,
-                            color: eliminated.isImposter ? Colors.green : Colors.orange,
+                            color: eliminated.isImpeter ? Colors.green : Colors.orange,
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        SizedBox(height: 15),
-                        Text(
-                          '${texts['wordWas']} ${_gameData.currentWord}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.deepPurple,
+                        const SizedBox(height: 15),
+                        // Only show word if game is over (not continuing)
+                        if (_isGameOver())
+                          Text(
+                            '${texts['wordWas']} ${_gameData.currentWord}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.deepPurple,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
                       ],
                     ),
                   ),
                 ),
-                SizedBox(height: 30),
-                if (_gameData.currentRound < GameSettings.instance.roundCount)
-                  ElevatedButton.icon(
-                    onPressed: _nextRound,
-                    icon: Icon(Icons.navigate_next),
-                    label: Text(
-                      texts['nextRound']!,
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                    ),
-                  )
-                else
+                const SizedBox(height: 30),
+                if (_isGameOver())
                   ElevatedButton.icon(
                     onPressed: () {
+                      _checkGameEnd();
                       Navigator.push(
                         context,
                         FadePageRoute(child: const FinalStatisticsScreen()),
@@ -1755,6 +1844,53 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       backgroundColor: Colors.deepPurple,
                       foregroundColor: Colors.white,
                     ),
+                  )
+                else if (_gameData.currentRound < GameSettings.instance.roundCount)
+                  ElevatedButton.icon(
+                    onPressed: _nextRound,
+                    icon: const Icon(Icons.navigate_next),
+                    label: Text(
+                      texts['nextRound']!,
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                    ),
+                  )
+                else
+                  Column(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _continueGame,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text(
+                          'Weiterspielen',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            FadePageRoute(child: const FinalStatisticsScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.bar_chart),
+                        label: Text(
+                          texts['statistics']!,
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -1957,7 +2093,7 @@ class FinalStatisticsScreen extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     gameData.reset();
-                    _MrWhiteAppState.restartApp();
+                    _ImpeterAppState.restartApp();
                   },
                   icon: const Icon(Icons.home),
                   label: Text(
