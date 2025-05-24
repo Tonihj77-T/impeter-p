@@ -19,6 +19,19 @@ class MrWhiteApp extends StatefulWidget {
 
 class _MrWhiteAppState extends State<MrWhiteApp> {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static _MrWhiteAppState? _instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _instance = this;
+  }
+
+  void rebuild() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +58,11 @@ class _MrWhiteAppState extends State<MrWhiteApp> {
       darkTheme: ThemeData.dark().copyWith(
         primaryColor: Colors.deepPurple,
         scaffoldBackgroundColor: const Color(0xFF121212),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E1E1E),
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
         cardTheme: CardThemeData(
           elevation: 8,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -60,9 +78,27 @@ class _MrWhiteAppState extends State<MrWhiteApp> {
             foregroundColor: Colors.white,
           ),
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1E1E1E),
-          foregroundColor: Colors.white,
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: Colors.deepPurple),
+          ),
+        ),
+        switchTheme: SwitchThemeData(
+          thumbColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.deepPurple;
+            }
+            return Colors.grey;
+          }),
+          trackColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return Colors.deepPurple.withOpacity(0.5);
+            }
+            return Colors.grey.withOpacity(0.3);
+          }),
         ),
       ),
       themeMode: GameSettings.instance.isDarkMode ? ThemeMode.dark : ThemeMode.light,
@@ -75,6 +111,10 @@ class _MrWhiteAppState extends State<MrWhiteApp> {
       MaterialPageRoute(builder: (context) => const HomeScreen()),
       (route) => false,
     );
+  }
+
+  static void rebuildApp() {
+    _instance?.rebuild();
   }
 }
 
@@ -185,6 +225,7 @@ class GameData {
   Timer? gameTimer;
   int remainingSeconds = 0;
   Map<String, int> gameStatistics = {};
+  Set<String> usedWords = {}; // Track used words to prevent repeats
 
   void reset() {
     // Store current names before clearing
@@ -205,6 +246,16 @@ class GameData {
   void resetStatistics() {
     gameStatistics.clear();
     persistentNames.clear();
+    // Also clear used words when resetting statistics
+    usedWords.clear();
+  }
+
+  void markWordAsUsed(String word) {
+    usedWords.add(word);
+  }
+
+  bool isWordUsed(String word) {
+    return usedWords.contains(word);
   }
 
   static GameData instance = GameData();
@@ -522,6 +573,79 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
+class _AnimatedButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  final Widget icon;
+  final Widget label;
+  final bool isPrimary;
+
+  const _AnimatedButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    this.isPrimary = false,
+  });
+
+  @override
+  _AnimatedButtonState createState() => _AnimatedButtonState();
+}
+
+class _AnimatedButtonState extends State<_AnimatedButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: widget.isPrimary
+          ? ElevatedButton.icon(
+              onPressed: () {
+                _controller.forward().then((_) {
+                  _controller.reverse();
+                  widget.onPressed();
+                });
+              },
+              icon: widget.icon,
+              label: widget.label,
+            )
+          : OutlinedButton.icon(
+              onPressed: () {
+                _controller.forward().then((_) {
+                  _controller.reverse();
+                  widget.onPressed();
+                });
+              },
+              icon: widget.icon,
+              label: widget.label,
+            ),
+    );
+  }
+}
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -770,7 +894,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         settings.isDarkMode = value;
                       });
                       // Rebuild the entire app to apply theme change
-                      _MrWhiteAppState.restartApp();
+                      _MrWhiteAppState.rebuildApp();
                     },
                   ),
                 ],
@@ -910,6 +1034,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     }
   }
 
+  String _selectUnusedWord(List<String> wordPool, Random rand) {
+    // First try to find unused words
+    List<String> unusedWords = wordPool.where((word) => !_gameData.isWordUsed(word)).toList();
+    
+    if (unusedWords.isNotEmpty) {
+      // Select from unused words
+      return unusedWords[rand.nextInt(unusedWords.length)];
+    } else {
+      // If all words have been used, reset and select any word
+      // Clear used words for this specific pool to start fresh
+      for (String word in wordPool) {
+        _gameData.usedWords.remove(word);
+      }
+      return wordPool[rand.nextInt(wordPool.length)];
+    }
+  }
+
   void _addPlayer() {
     if (_playerNameController.text.trim().isEmpty) return;
     if (_gameData.players.length < GameSettings.instance.playerCount) {
@@ -941,7 +1082,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     int impIdx = rand.nextInt(_gameData.players.length);
     _gameData.players[impIdx].isImposter = true;
 
-    // Select word with 25% chance for custom words if available
+    // Select word with 25% chance for custom words if available, avoiding repeats
     List<String> standardPool;
     switch (settings.gameMode) {
       case GameMode.places:
@@ -954,13 +1095,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         standardPool = WordDatabase.classic;
     }
     
+    String selectedWord;
+    
     if (settings.customWords.isNotEmpty && rand.nextDouble() < 0.25) {
       // 25% chance to select from custom words
-      _gameData.currentWord = settings.customWords[rand.nextInt(settings.customWords.length)];
+      selectedWord = _selectUnusedWord(settings.customWords, rand);
     } else {
       // 75% chance to select from standard pool
-      _gameData.currentWord = standardPool[rand.nextInt(standardPool.length)];
+      selectedWord = _selectUnusedWord(standardPool, rand);
     }
+    
+    _gameData.currentWord = selectedWord;
+    _gameData.markWordAsUsed(selectedWord);
 
     // Set timer
     if (settings.timerMinutes > 0) {
