@@ -98,6 +98,67 @@ class GameSettings {
 enum GameMode { classic, places, words }
 enum GamePhase { setup, roleReveal, discussion, voting, results }
 
+// Custom page transitions
+class SlidePageRoute<T> extends PageRouteBuilder<T> {
+  final Widget child;
+  final AxisDirection direction;
+
+  SlidePageRoute({
+    required this.child,
+    this.direction = AxisDirection.right,
+  }) : super(
+          pageBuilder: (context, animation, secondaryAnimation) => child,
+          transitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            Offset begin;
+            const Offset end = Offset.zero;
+            
+            switch (direction) {
+              case AxisDirection.up:
+                begin = const Offset(0.0, 1.0);
+                break;
+              case AxisDirection.down:
+                begin = const Offset(0.0, -1.0);
+                break;
+              case AxisDirection.left:
+                begin = const Offset(1.0, 0.0);
+                break;
+              case AxisDirection.right:
+                begin = const Offset(-1.0, 0.0);
+                break;
+            }
+
+            final tween = Tween(begin: begin, end: end);
+            final offsetAnimation = animation.drive(tween.chain(
+              CurveTween(curve: Curves.easeInOutCubic),
+            ));
+
+            return SlideTransition(
+              position: offsetAnimation,
+              child: child,
+            );
+          },
+        );
+}
+
+class FadePageRoute<T> extends PageRouteBuilder<T> {
+  final Widget child;
+
+  FadePageRoute({required this.child})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => child,
+          transitionDuration: const Duration(milliseconds: 250),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation.drive(
+                CurveTween(curve: Curves.easeInOut),
+              ),
+              child: child,
+            );
+          },
+        );
+}
+
 class Player {
   String name;
   bool isImposter;
@@ -340,8 +401,50 @@ const Map<String, String> englishTexts = {
 };
 
 // Haupt-Screens
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
+    );
+    
+    _fadeController.forward();
+    Future.delayed(const Duration(milliseconds: 200), () {
+      _scaleController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _scaleController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -360,42 +463,58 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.group,
-                size: 120,
-                color: Colors.deepPurple,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 1000),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    builder: (context, value, child) {
+                      return Transform.rotate(
+                        angle: value * 0.1,
+                        child: Icon(
+                          Icons.group,
+                          size: 120,
+                          color: Colors.deepPurple.withOpacity(value),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 40),
+                  _AnimatedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      SlidePageRoute(child: const GameScreen()),
+                    ),
+                    icon: const Icon(Icons.play_arrow),
+                    label: Text(texts['startGame']!),
+                    isPrimary: true,
+                  ),
+                  const SizedBox(height: 16),
+                  _AnimatedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      SlidePageRoute(child: const SettingsScreen(), direction: AxisDirection.up),
+                    ),
+                    icon: const Icon(Icons.settings),
+                    label: Text(texts['settings']!),
+                  ),
+                  const SizedBox(height: 16),
+                  _AnimatedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      FadePageRoute(child: const StatisticsScreen()),
+                    ),
+                    icon: const Icon(Icons.bar_chart),
+                    label: Text(texts['statistics']!),
+                  ),
+                ],
               ),
-              const SizedBox(height: 40),
-              ElevatedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const GameScreen()),
-                ),
-                icon: const Icon(Icons.play_arrow),
-                label: Text(texts['startGame']!),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-                icon: const Icon(Icons.settings),
-                label: Text(texts['settings']!),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const StatisticsScreen()),
-                ),
-                icon: const Icon(Icons.bar_chart),
-                label: Text(texts['statistics']!),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -413,19 +532,76 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final settings = GameSettings.instance;
   final _customWordController = TextEditingController();
+  final _customTipController = TextEditingController();
 
   void _addCustomWord() {
     if (_customWordController.text.trim().isEmpty) return;
+    final word = _customWordController.text.trim();
+    final tip = _customTipController.text.trim();
+    
     setState(() {
-      settings.customWords.add(_customWordController.text.trim());
+      settings.customWords.add(word);
+      if (tip.isNotEmpty) {
+        settings.customWordTips[word] = tip;
+      }
       _customWordController.clear();
+      _customTipController.clear();
     });
   }
 
   void _removeCustomWord(int index) {
     setState(() {
+      final word = settings.customWords[index];
       settings.customWords.removeAt(index);
+      settings.customWordTips.remove(word);
     });
+  }
+
+  void _showAddWordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(settings.texts['addCustomWord']!),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _customWordController,
+              decoration: InputDecoration(
+                labelText: 'Wort',
+                border: const OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _customTipController,
+              decoration: InputDecoration(
+                labelText: 'Tipp (optional)',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _customWordController.clear();
+              _customTipController.clear();
+              Navigator.pop(context);
+            },
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _addCustomWord();
+              Navigator.pop(context);
+            },
+            child: const Text('Hinzufügen'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -636,17 +812,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-                  TextField(
-                    controller: _customWordController,
-                    decoration: InputDecoration(
-                      labelText: texts['addCustomWord'],
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: _addCustomWord,
-                      ),
+                  ElevatedButton.icon(
+                    onPressed: _showAddWordDialog,
+                    icon: const Icon(Icons.add),
+                    label: Text(texts['addCustomWord']!),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    onSubmitted: (_) => _addCustomWord(),
                   ),
                   const SizedBox(height: 10),
                   if (settings.customWords.isNotEmpty)
@@ -661,6 +833,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ...settings.customWords.asMap().entries.map((entry) {
                           final index = entry.key;
                           final word = entry.value;
+                          final tip = settings.customWordTips[word];
                           return Card(
                             margin: const EdgeInsets.symmetric(vertical: 2),
                             child: ListTile(
@@ -670,6 +843,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 child: Text('${index + 1}'),
                               ),
                               title: Text(word),
+                              subtitle: tip != null ? Text('Tipp: $tip') : null,
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () => _removeCustomWord(index),
@@ -688,7 +862,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => const GameScreen()),
+                SlidePageRoute(child: const GameScreen()),
               );
             },
             style: ElevatedButton.styleFrom(
@@ -704,6 +878,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _customWordController.dispose();
+    _customTipController.dispose();
     super.dispose();
   }
 }
@@ -869,7 +1044,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     } else {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const FinalStatisticsScreen()),
+        FadePageRoute(child: const FinalStatisticsScreen()),
       );
     }
   }
@@ -1021,9 +1196,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     });
                   },
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 600),
+                    duration: const Duration(milliseconds: 300),
                     transitionBuilder: (Widget child, Animation<double> animation) {
-                      return ScaleTransition(scale: animation, child: child);
+                      return ScaleTransition(
+                        scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+                          CurvedAnimation(parent: animation, curve: Curves.elasticOut)
+                        ),
+                        child: child,
+                      );
                     },
                     child: _isCardFlipped
                         ? _buildRevealedCard(player, texts, settings)
@@ -1416,7 +1596,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const FinalStatisticsScreen()),
+                        FadePageRoute(child: const FinalStatisticsScreen()),
                       );
                     },
                     icon: const Icon(Icons.bar_chart),
