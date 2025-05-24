@@ -1,16 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math';
-void main() {
-  runApp(MrWhiteApp());
+import 'dart:convert';
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  await WordDatabase.loadWords();
+  runApp(const MrWhiteApp());
 }
 
-class MrWhiteApp extends StatelessWidget {
+class MrWhiteApp extends StatefulWidget {
   const MrWhiteApp({super.key});
+
+  @override
+  _MrWhiteAppState createState() => _MrWhiteAppState();
+}
+
+class _MrWhiteAppState extends State<MrWhiteApp> {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Mr. White',
       theme: ThemeData(
         primarySwatch: Colors.deepPurple,
@@ -19,17 +32,48 @@ class MrWhiteApp extends StatelessWidget {
         cardTheme: CardThemeData(
           elevation: 12,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            padding: EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
             elevation: 8,
           ),
         ),
       ),
-      home: HomeScreen(),
+      darkTheme: ThemeData.dark().copyWith(
+        primaryColor: Colors.deepPurple,
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        cardTheme: CardThemeData(
+          elevation: 8,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: const Color(0xFF1E1E1E),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+            elevation: 8,
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E1E1E),
+          foregroundColor: Colors.white,
+        ),
+      ),
+      themeMode: GameSettings.instance.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      home: const HomeScreen(),
+    );
+  }
+
+  static void restartApp() {
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const HomeScreen()),
+      (route) => false,
     );
   }
 }
@@ -42,6 +86,9 @@ class GameSettings {
   String language = 'de';
   GameMode gameMode = GameMode.classic;
   List<String> customWords = [];
+  Map<String, String> customWordTips = {};
+  bool isDarkMode = false;
+  bool showTips = false;
 
   static GameSettings instance = GameSettings();
 
@@ -56,25 +103,31 @@ class Player {
   bool isImposter;
   bool isEliminated;
   int voteCount;
+  int wins;
 
   Player({
     required this.name,
     this.isImposter = false,
     this.isEliminated = false,
     this.voteCount = 0,
+    this.wins = 0,
   });
 }
 
 class GameData {
   List<Player> players = [];
+  List<String> persistentNames = [];
   int currentRound = 1;
   int currentPlayerIndex = 0;
   String currentWord = '';
   GamePhase phase = GamePhase.setup;
   Timer? gameTimer;
   int remainingSeconds = 0;
+  Map<String, int> gameStatistics = {};
 
   void reset() {
+    // Store current names before clearing
+    persistentNames = players.map((p) => p.name).toList();
     players.clear();
     currentRound = 1;
     currentPlayerIndex = 0;
@@ -83,21 +136,112 @@ class GameData {
     gameTimer?.cancel();
     remainingSeconds = 0;
   }
+
+  void addWinToPlayer(String playerName) {
+    gameStatistics[playerName] = (gameStatistics[playerName] ?? 0) + 1;
+  }
+
+  void resetStatistics() {
+    gameStatistics.clear();
+    persistentNames.clear();
+  }
+
+  static GameData instance = GameData();
 }
 
 // Wort-Datenbanken
 class WordDatabase {
-  static const places = [
-    'Berlin', 'Paris', 'London', 'New York', 'Tokio', 'Rom', 'Madrid', 'Amsterdam',
-    'Wien', 'Zürich', 'Moskau', 'Sydney', 'Kairo', 'Bangkok', 'Mumbai', 'Shanghai'
-  ];
+  static List<String> places = [];
+  static List<String> words = [];
+  static List<String> classic = [];
+  static Map<String, String> tips = {};
+  static bool _isLoaded = false;
 
-  static const words = [
-    'Apfel', 'Auto', 'Hund', 'Computer', 'Blume', 'Buch', 'Stuhl', 'Telefon',
-    'Kamera', 'Gitarre', 'Pizza', 'Schokolade', 'Regenschirm', 'Brille', 'Schlüssel'
-  ];
+  static Future<void> loadWords() async {
+    if (_isLoaded) return;
+    
+    try {
+      final String jsonString = await rootBundle.loadString('assets/words.json');
+      final Map<String, dynamic> data = json.decode(jsonString);
+      
+      places = (data['places'] as List)
+          .map((item) => item['word'] as String)
+          .toList();
+      
+      words = (data['words'] as List)
+          .map((item) => item['word'] as String)
+          .toList();
+      
+      classic = [...places, ...words];
+      
+      // Load tips
+      tips.clear();
+      for (var item in data['places'] as List) {
+        tips[item['word']] = item['tip'];
+      }
+      for (var item in data['words'] as List) {
+        tips[item['word']] = item['tip'];
+      }
+      
+      _isLoaded = true;
+    } catch (e) {
+      // Fallback to hardcoded words if JSON loading fails
+      places = [
+        'Berlin', 'Paris', 'London', 'New York', 'Tokio', 'Rom', 'Madrid', 'Amsterdam',
+        'Wien', 'Zürich', 'Moskau', 'Sydney', 'Kairo', 'Bangkok', 'Mumbai', 'Shanghai'
+      ];
+      words = [
+        'Apfel', 'Auto', 'Hund', 'Computer', 'Blume', 'Buch', 'Stuhl', 'Telefon',
+        'Kamera', 'Gitarre', 'Pizza', 'Schokolade', 'Regenschirm', 'Brille', 'Schlüssel'
+      ];
+      classic = [...places, ...words];
+      
+      // Fallback tips
+      tips = {
+        'Berlin': 'Deutsche Großstadt',
+        'Paris': 'Europäische Hauptstadt',
+        'London': 'Inselstaat-Zentrum',
+        'New York': 'Amerikanische Metropole',
+        'Tokio': 'Asiatische Millionenstadt',
+        'Rom': 'Antike Hauptstadt',
+        'Madrid': 'Iberische Halbinsel',
+        'Amsterdam': 'Niederlande',
+        'Wien': 'Österreich',
+        'Zürich': 'Schweiz',
+        'Moskau': 'Osteuropäische Großstadt',
+        'Sydney': 'Südhalbkugel',
+        'Kairo': 'Nordafrikanische Stadt',
+        'Bangkok': 'Südostasien',
+        'Mumbai': 'Südasiatische Küstenstadt',
+        'Shanghai': 'Ostasiatischer Hafen',
+        'Apfel': 'Obst',
+        'Auto': 'Fortbewegungsmittel',
+        'Hund': 'Haustier',
+        'Computer': 'Technisches Gerät',
+        'Blume': 'Pflanze',
+        'Buch': 'Lesematerial',
+        'Stuhl': 'Möbelstück',
+        'Telefon': 'Kommunikationsgerät',
+        'Kamera': 'Optisches Gerät',
+        'Gitarre': 'Musikinstrument',
+        'Pizza': 'Italienisches Gericht',
+        'Schokolade': 'Süßware',
+        'Regenschirm': 'Wetterschutz',
+        'Brille': 'Sehhilfe',
+        'Schlüssel': 'Öffnungsgerät',
+      };
+      _isLoaded = true;
+    }
+  }
 
-  static const classic = [...places, ...words];
+  static String getTip(String word) {
+    // Check custom tips first
+    if (GameSettings.instance.customWordTips.containsKey(word)) {
+      return GameSettings.instance.customWordTips[word]!;
+    }
+    // Then check standard tips
+    return tips[word] ?? 'Kein Tipp verfügbar';
+  }
 }
 
 // Übersetzungen
@@ -134,7 +278,18 @@ const Map<String, String> germanTexts = {
   'roundCount': 'Rundenanzahl:',
   'timerMinutes': 'Timer (Minuten):',
   'customWords': 'Eigene Wörter (Komma getrennt)',
-  'needsAllPlayers': 'Alle Spielerplätze müssen besetzt sein!'
+  'needsAllPlayers': 'Alle Spielerplätze müssen besetzt sein!',
+  'statistics': 'Statistik',
+  'wins': 'Siege',
+  'resetStatistics': 'Statistik zurücksetzen',
+  'noGamesPlayed': 'Noch keine Spiele gespielt.',
+  'darkMode': 'Dunkler Modus',
+  'showTips': 'Tipps anzeigen',
+  'tip': 'Tipp:',
+  'tapToReveal': 'Tippe zum Aufdecken',
+  'addCustomWord': 'Eigenes Wort hinzufügen',
+  'customWordsList': 'Eigene Wörter',
+  'deleteWord': 'Wort löschen'
 };
 
 const Map<String, String> englishTexts = {
@@ -170,7 +325,18 @@ const Map<String, String> englishTexts = {
   'roundCount': 'Round Count:',
   'timerMinutes': 'Timer (Minutes):',
   'customWords': 'Custom Words (comma separated)',
-  'needsAllPlayers': 'All player slots must be filled!'
+  'needsAllPlayers': 'All player slots must be filled!',
+  'statistics': 'Statistics',
+  'wins': 'Wins',
+  'resetStatistics': 'Reset Statistics',
+  'noGamesPlayed': 'No games played yet.',
+  'darkMode': 'Dark Mode',
+  'showTips': 'Show Tips',
+  'tip': 'Tip:',
+  'tapToReveal': 'Tap to Reveal',
+  'addCustomWord': 'Add Custom Word',
+  'customWordsList': 'Custom Words',
+  'deleteWord': 'Delete Word'
 };
 
 // Haupt-Screens
@@ -197,28 +363,37 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
+              const Icon(
                 Icons.group,
                 size: 120,
                 color: Colors.deepPurple,
               ),
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
               ElevatedButton.icon(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => SettingsScreen()),
+                  MaterialPageRoute(builder: (_) => const GameScreen()),
                 ),
-                icon: Icon(Icons.play_arrow),
+                icon: const Icon(Icons.play_arrow),
                 label: Text(texts['startGame']!),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => SettingsScreen()),
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 ),
-                icon: Icon(Icons.settings),
+                icon: const Icon(Icons.settings),
                 label: Text(texts['settings']!),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StatisticsScreen()),
+                ),
+                icon: const Icon(Icons.bar_chart),
+                label: Text(texts['statistics']!),
               ),
             ],
           ),
@@ -237,7 +412,21 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final settings = GameSettings.instance;
-  final _customController = TextEditingController();
+  final _customWordController = TextEditingController();
+
+  void _addCustomWord() {
+    if (_customWordController.text.trim().isEmpty) return;
+    setState(() {
+      settings.customWords.add(_customWordController.text.trim());
+      _customWordController.clear();
+    });
+  }
+
+  void _removeCustomWord(int index) {
+    setState(() {
+      settings.customWords.removeAt(index);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -247,17 +436,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: Text(texts['settings']!),
       ),
       body: ListView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         children: [
           Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     '${texts['playerCount']} ${settings.playerCount}',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   Slider(
                     min: 3,
@@ -275,13 +464,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     '${texts['roundCount']} ${settings.roundCount}',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   Slider(
                     min: 1,
@@ -299,13 +488,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     '${texts['timerMinutes']} ${settings.timerMinutes}',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   Slider(
                     min: 0,
@@ -323,19 +512,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Sprache / Language',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   DropdownButton<String>(
                     value: settings.language,
                     isExpanded: true,
-                    items: [
+                    items: const [
                       DropdownMenuItem(value: 'de', child: Text('Deutsch')),
                       DropdownMenuItem(value: 'en', child: Text('English')),
                     ],
@@ -349,15 +538,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Spielmodus / Game Mode',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   DropdownButton<GameMode>(
                     value: settings.gameMode,
                     isExpanded: true,
@@ -389,48 +578,133 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    texts['customWords']!,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    texts['darkMode']!,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: _customController,
-                    decoration: InputDecoration(
-                      labelText: texts['customWords'],
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 3,
+                  SwitchListTile(
+                    title: Text(texts['darkMode']!),
+                    value: settings.isDarkMode,
+                    onChanged: (value) {
+                      setState(() {
+                        settings.isDarkMode = value;
+                      });
+                      // Rebuild the entire app to apply theme change
+                      _MrWhiteAppState.restartApp();
+                    },
                   ),
                 ],
               ),
             ),
           ),
-          SizedBox(height: 20),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    texts['showTips']!,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  SwitchListTile(
+                    title: Text(texts['showTips']!),
+                    subtitle: const Text('Imposter bekommt Hinweise zum Wort'),
+                    value: settings.showTips,
+                    onChanged: (value) {
+                      setState(() {
+                        settings.showTips = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    texts['customWordsList']!,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _customWordController,
+                    decoration: InputDecoration(
+                      labelText: texts['addCustomWord'],
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: _addCustomWord,
+                      ),
+                    ),
+                    onSubmitted: (_) => _addCustomWord(),
+                  ),
+                  const SizedBox(height: 10),
+                  if (settings.customWords.isNotEmpty)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Eigene Wörter:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        ...settings.customWords.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final word = entry.value;
+                          return Card(
+                            margin: const EdgeInsets.symmetric(vertical: 2),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.deepPurple,
+                                foregroundColor: Colors.white,
+                                child: Text('${index + 1}'),
+                              ),
+                              title: Text(word),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _removeCustomWord(index),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () {
-              settings.customWords = _customController.text
-                  .split(',')
-                  .map((w) => w.trim())
-                  .where((w) => w.isNotEmpty)
-                  .toList();
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (_) => GameScreen()),
+                MaterialPageRoute(builder: (_) => const GameScreen()),
               );
             },
             style: ElevatedButton.styleFrom(
-              padding: EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             child: Text(texts['startGame']!),
           ),
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _customWordController.dispose();
+    super.dispose();
   }
 }
 
@@ -442,8 +716,24 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
-  final GameData _gameData = GameData();
+  final GameData _gameData = GameData.instance;
   final _playerNameController = TextEditingController();
+  bool _isCardFlipped = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPersistentPlayers();
+  }
+
+  void _loadPersistentPlayers() {
+    _gameData.players.clear();
+    for (String name in _gameData.persistentNames) {
+      if (_gameData.players.length < GameSettings.instance.playerCount) {
+        _gameData.players.add(Player(name: name));
+      }
+    }
+  }
 
   void _addPlayer() {
     if (_playerNameController.text.trim().isEmpty) return;
@@ -476,20 +766,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     int impIdx = rand.nextInt(_gameData.players.length);
     _gameData.players[impIdx].isImposter = true;
 
-    // Select word
-    List<String> pool;
+    // Select word with 25% chance for custom words if available
+    List<String> standardPool;
     switch (settings.gameMode) {
       case GameMode.places:
-        pool = WordDatabase.places;
+        standardPool = WordDatabase.places;
         break;
       case GameMode.words:
-        pool = WordDatabase.words;
+        standardPool = WordDatabase.words;
         break;
       default:
-        pool = WordDatabase.classic;
+        standardPool = WordDatabase.classic;
     }
-    pool = [...pool, ...settings.customWords];
-    _gameData.currentWord = pool[rand.nextInt(pool.length)];
+    
+    if (settings.customWords.isNotEmpty && rand.nextDouble() < 0.25) {
+      // 25% chance to select from custom words
+      _gameData.currentWord = settings.customWords[rand.nextInt(settings.customWords.length)];
+    } else {
+      // 75% chance to select from standard pool
+      _gameData.currentWord = standardPool[rand.nextInt(standardPool.length)];
+    }
 
     // Set timer
     if (settings.timerMinutes > 0) {
@@ -499,11 +795,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     setState(() {
       _gameData.phase = GamePhase.roleReveal;
       _gameData.currentPlayerIndex = 0;
+      _isCardFlipped = false;
     });
   }
 
   void _nextPlayer() {
     setState(() {
+      _isCardFlipped = false;
       if (_gameData.currentPlayerIndex < _gameData.players.length - 1) {
         _gameData.currentPlayerIndex++;
       } else {
@@ -549,6 +847,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     setState(() {
       eliminated.isEliminated = true;
       _gameData.phase = GamePhase.results;
+      
+      // Track win: if imposter eliminated, all non-imposters win, otherwise imposter wins
+      if (eliminated.isImposter) {
+        for (var player in _gameData.players.where((p) => !p.isImposter)) {
+          _gameData.addWinToPlayer(player.name);
+        }
+      } else {
+        final imposter = _gameData.players.firstWhere((p) => p.isImposter);
+        _gameData.addWinToPlayer(imposter.name);
+      }
     });
   }
 
@@ -559,21 +867,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         _gameData.phase = GamePhase.setup;
       });
     } else {
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text(GameSettings.instance.texts['gameOver']!),
-          content: Text(GameSettings.instance.texts['finalResults']!),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).popUntil((r) => r.isFirst);
-                _gameData.reset();
-              },
-              child: Text(GameSettings.instance.texts['newGame']!),
-            )
-          ],
-        ),
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const FinalStatisticsScreen()),
       );
     }
   }
@@ -684,6 +980,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   Widget _buildRoleReveal() {
     final texts = GameSettings.instance.texts;
+    final settings = GameSettings.instance;
     final player = _gameData.players[_gameData.currentPlayerIndex];
     final isLast = _gameData.currentPlayerIndex == _gameData.players.length - 1;
 
@@ -698,60 +995,176 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: player.isImposter
-                ? [Colors.red.shade100, Colors.red.shade50]
-                : [Colors.green.shade100, Colors.green.shade50],
+            colors: _isCardFlipped
+                ? (player.isImposter
+                    ? [Colors.red.shade100, Colors.red.shade50]
+                    : [Colors.green.shade100, Colors.green.shade50])
+                : [Colors.deepPurple.shade100, Colors.deepPurple.shade50],
           ),
         ),
         child: Center(
           child: Padding(
-            padding: EdgeInsets.all(32),
+            padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  player.isImposter ? Icons.warning : Icons.check_circle,
-                  size: 80,
-                  color: player.isImposter ? Colors.red : Colors.green,
-                ),
-                SizedBox(height: 20),
                 Text(
                   player.name,
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 30),
-                Card(
-                  elevation: 8,
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      player.isImposter
-                          ? texts['youAreImposter']!
-                          : '${texts['youAreNot']} ${_gameData.currentWord}',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                        color: player.isImposter ? Colors.red : Colors.green,
-                      ),
-                    ),
+                const SizedBox(height: 30),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isCardFlipped = true;
+                    });
+                  },
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 600),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      return ScaleTransition(scale: animation, child: child);
+                    },
+                    child: _isCardFlipped
+                        ? _buildRevealedCard(player, texts, settings)
+                        : _buildHiddenCard(texts),
                   ),
                 ),
-                SizedBox(height: 40),
-                ElevatedButton.icon(
-                  onPressed: _nextPlayer,
-                  icon: Icon(isLast ? Icons.play_arrow : Icons.navigate_next),
-                  label: Text(
-                    isLast ? texts['discussion']! : texts['next']!,
-                    style: TextStyle(fontSize: 18),
+                const SizedBox(height: 40),
+                if (_isCardFlipped)
+                  ElevatedButton.icon(
+                    onPressed: _nextPlayer,
+                    icon: Icon(isLast ? Icons.play_arrow : Icons.navigate_next),
+                    label: Text(
+                      isLast ? texts['discussion']! : texts['next']!,
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                    ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHiddenCard(Map<String, String> texts) {
+    return Card(
+      key: const ValueKey('hidden'),
+      elevation: 12,
+      child: Container(
+        width: 300,
+        height: 200,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.deepPurple.shade300, Colors.deepPurple.shade600],
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.touch_app,
+              size: 60,
+              color: Colors.white,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              texts['tapToReveal']!,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRevealedCard(Player player, Map<String, String> texts, GameSettings settings) {
+    String tipText = '';
+    if (settings.showTips && player.isImposter) {
+      tipText = WordDatabase.getTip(_gameData.currentWord);
+    }
+
+    return Card(
+      key: const ValueKey('revealed'),
+      elevation: 12,
+      child: Container(
+        width: 300,
+        height: 200,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: player.isImposter
+                ? [Colors.red.shade300, Colors.red.shade600]
+                : [Colors.green.shade300, Colors.green.shade600],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                player.isImposter ? Icons.warning : Icons.check_circle,
+                size: 40,
+                color: Colors.white,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                player.isImposter
+                    ? texts['youAreImposter']!
+                    : '${texts['youAreNot']} ${_gameData.currentWord}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              if (settings.showTips && player.isImposter && tipText.isNotEmpty) ...[
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        texts['tip']!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        tipText,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
+            ],
           ),
         ),
       ),
@@ -995,22 +1408,24 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       style: TextStyle(fontSize: 18),
                     ),
                     style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                     ),
                   )
                 else
                   ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.of(context).popUntil((r) => r.isFirst);
-                      _gameData.reset();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const FinalStatisticsScreen()),
+                      );
                     },
-                    icon: Icon(Icons.home),
+                    icon: const Icon(Icons.bar_chart),
                     label: Text(
-                      texts['newGame']!,
-                      style: TextStyle(fontSize: 18),
+                      texts['statistics']!,
+                      style: const TextStyle(fontSize: 18),
                     ),
                     style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                       backgroundColor: Colors.deepPurple,
                       foregroundColor: Colors.white,
                     ),
@@ -1028,5 +1443,212 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _gameData.gameTimer?.cancel();
     _playerNameController.dispose();
     super.dispose();
+  }
+}
+
+class StatisticsScreen extends StatelessWidget {
+  const StatisticsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = GameSettings.instance.texts;
+    final gameData = GameData.instance;
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(texts['statistics']!),
+        centerTitle: true,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            if (gameData.gameStatistics.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    texts['noGamesPlayed']!,
+                    style: const TextStyle(fontSize: 18),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: gameData.gameStatistics.length,
+                  itemBuilder: (_, index) {
+                    final entry = gameData.gameStatistics.entries.elementAt(index);
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.deepPurple,
+                          foregroundColor: Colors.white,
+                          child: Text('${index + 1}'),
+                        ),
+                        title: Text(entry.key),
+                        trailing: Text(
+                          '${entry.value} ${texts['wins']!}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 16),
+            if (gameData.gameStatistics.isNotEmpty)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: Text(texts['resetStatistics']!),
+                        content: const Text('Möchten Sie wirklich alle Statistiken zurücksetzen?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Abbrechen'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              gameData.resetStatistics();
+                              Navigator.pop(context);
+                              Navigator.pop(context);
+                            },
+                            child: const Text('Zurücksetzen'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: Text(texts['resetStatistics']!),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class FinalStatisticsScreen extends StatelessWidget {
+  const FinalStatisticsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = GameSettings.instance.texts;
+    final gameData = GameData.instance;
+    
+    // Sort statistics by wins (descending)
+    final sortedStats = gameData.gameStatistics.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(texts['gameOver']!),
+        automaticallyImplyLeading: false,
+        centerTitle: true,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.deepPurple.shade100, Colors.white],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: [
+              const Icon(
+                Icons.emoji_events,
+                size: 80,
+                color: Colors.amber,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                texts['statistics']!,
+                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 30),
+              if (sortedStats.isEmpty)
+                const Text(
+                  'Keine Statistiken verfügbar',
+                  style: TextStyle(fontSize: 18),
+                  textAlign: TextAlign.center,
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: sortedStats.length,
+                    itemBuilder: (_, index) {
+                      final entry = sortedStats[index];
+                      final isWinner = index == 0;
+                      return Card(
+                        elevation: isWinner ? 12 : 4,
+                        color: isWinner ? Colors.amber.shade100 : null,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isWinner ? Colors.amber : Colors.deepPurple,
+                            foregroundColor: Colors.white,
+                            child: isWinner
+                                ? const Icon(Icons.emoji_events)
+                                : Text('${index + 1}'),
+                          ),
+                          title: Text(
+                            entry.key,
+                            style: TextStyle(
+                              fontWeight: isWinner ? FontWeight.bold : FontWeight.normal,
+                              fontSize: isWinner ? 18 : 16,
+                            ),
+                          ),
+                          trailing: Text(
+                            '${entry.value} ${texts['wins']!}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: isWinner ? 18 : 16,
+                              color: isWinner ? Colors.amber.shade800 : null,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    gameData.reset();
+                    _MrWhiteAppState.restartApp();
+                  },
+                  icon: const Icon(Icons.home),
+                  label: Text(
+                    texts['newGame']!,
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

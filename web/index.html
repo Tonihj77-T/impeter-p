@@ -1,38 +1,1020 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imposter Spiel</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #34495e;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --transition: all 0.3s ease;
+        }
 
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+        body {
+            background-color: var(--light-color);
+            color: var(--dark-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
 
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="$FLUTTER_BASE_HREF">
+        h1 {
+            color: var(--secondary-color);
+            margin-bottom: 20px;
+            text-align: center;
+        }
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="impeter">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+        .setup-container, .player-input-container, .game-container, .role-reveal-container, .voting-container, .result-container {
+            display: none;
+        }
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+        .active {
+            display: block;
+        }
 
-  <title>impeter</title>
-  <link rel="manifest" href="manifest.json">
+        .settings-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 10px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: var(--transition);
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        button.secondary {
+            background-color: var(--secondary-color);
+        }
+
+        button.danger {
+            background-color: var(--accent-color);
+        }
+
+        .player-list {
+            margin-top: 20px;
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .player-item:last-child {
+            border-bottom: none;
+        }
+
+        .remove-player {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 3px;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .role-card {
+            border: 2px solid var(--primary-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            cursor: pointer;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .role-hidden {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .voting-list {
+            margin-top: 20px;
+        }
+
+        .voting-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .voting-item:hover {
+            background-color: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .result-message {
+            text-align: center;
+            font-size: 24px;
+            margin: 20px 0;
+        }
+
+        /* Home-Button immer sichtbar, außer im Ergebnis-Container */
+        #new-game-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: auto;
+            padding: 8px 15px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        /* Wenn der Ergebnis-Container aktiv ist, soll der globale Button verschwinden */
+        .result-container.active ~ #new-game-button {
+            display: none;
+        }
+
+
+        .game-status {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        /* CSS für den großen Button im Ergebnisbereich */
+        .large-button {
+            padding: 20px 30px;
+            font-size: 20px;
+            margin-top: 30px;
+            margin-bottom: 0;
+            width: 100%;
+            max-width: 300px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            button {
+                padding: 10px;
+            }
+
+            #new-game-button {
+                top: 10px;
+                right: 10px;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+
+        /* Custom Dialog Styles */
+        .custom-dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .custom-dialog-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .custom-dialog-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .custom-dialog-overlay.show .custom-dialog-content {
+            transform: scale(1);
+        }
+
+        .custom-dialog-content h3 {
+            color: var(--secondary-color);
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .custom-dialog-content p {
+            margin-bottom: 25px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .custom-dialog-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .custom-dialog-buttons button {
+            width: auto;
+            flex: 1;
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-bottom: 0; /* Override default button margin */
+        }
+
+        .custom-dialog-buttons button:first-child { /* Cancel button */
+            background-color: #95a5a6; /* Greyish color for cancel */
+        }
+
+        .custom-dialog-buttons button:first-child:hover {
+            background-color: #7f8c8d;
+        }
+
+        .custom-dialog-buttons button:last-child { /* Confirm button */
+            background-color: var(--primary-color);
+        }
+        .custom-dialog-buttons button.danger-confirm {
+            background-color: var(--accent-color);
+        }
+    </style>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+    <h1>Imposter Spiel</h1>
+
+    <button id="new-game-button">Neues Spiel</button>
+
+    <div class="container setup-container active">
+        <div class="settings-group">
+            <label for="player-count">Anzahl der Spieler:</label>
+            <input type="number" id="player-count" min="3" max="20" value="4">
+        </div>
+
+        <div class="settings-group">
+            <label for="imposter-count">Anzahl der Imposter:</label>
+            <input type="number" id="imposter-count" min="1" max="5" value="1">
+        </div>
+
+        <div class="settings-group">
+            <input type="checkbox" id="show-tips" checked>
+            <label for="show-tips" style="display: inline;">Tipps anzeigen</label>
+        </div>
+
+        <button id="confirm-settings">Spieleinstellungen bestätigen</button>
+        <button id="reset-settings-button" class="danger">Einstellungen zurücksetzen</button>
+    </div>
+
+    <div class="container player-input-container">
+        <h2>Spieler hinzufügen</h2>
+        <div class="player-status" id="player-status">
+            <p>Bitte füge <span id="remaining-players"></span> Spieler hinzu.</p>
+        </div>
+        <div class="player-input-form">
+            <label for="player-name">Spielername:</label>
+            <input type="text" id="player-name" placeholder="Namen eingeben">
+            <button id="add-player">Spieler hinzufügen</button>
+        </div>
+
+        <div class="player-list" id="player-list">
+        </div>
+
+        <button id="start-game" disabled>Spiel starten</button>
+    </div>
+
+    <div class="container game-container">
+        <div class="role-distribution-container">
+            <h2>Rollen verteilen</h2>
+            <div class="game-status" id="current-player-display">
+                Spieler: <span id="current-player-name"></span>
+            </div>
+
+            <div class="role-card role-hidden" id="role-card">
+                <p>Klicke hier, um deine Rolle zu sehen</p>
+            </div>
+
+            <button id="next-player">Weitergeben</button>
+        </div>
+    </div>
+
+    <div class="container role-reveal-container">
+        <h2>Die Diskussion beginnt!</h2>
+        <div class="game-status">
+            <p><span id="starting-player"></span> beginnt die Diskussion.</p>
+        </div>
+
+        <button id="start-voting">Abstimmung starten</button>
+    </div>
+
+    <div class="container voting-container">
+        <h2>Abstimmung</h2>
+        <p>Wählt gemeinsam, wer das Spiel verlassen soll:</p>
+
+        <div class="voting-list" id="voting-list">
+        </div>
+    </div>
+
+    <div class="container result-container">
+        <h2>Ergebnis</h2>
+        <div class="result-message" id="result-message">
+        </div>
+
+        <div id="game-status-info">
+        </div>
+
+        <button id="continue-game">Weiterspielen</button>
+        <button id="restart-game-after-result" style="display: none;">Neues Spiel</button>
+    </div>
+
+    <div class="custom-dialog-overlay" id="custom-dialog-overlay">
+        <div class="custom-dialog-content">
+            <h3 id="dialog-title"></h3>
+            <p id="dialog-message"></p>
+            <div class="custom-dialog-buttons">
+                <button id="dialog-cancel-button">Abbrechen</button>
+                <button id="dialog-confirm-button">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let wordPairs = []; // Wird von der externen Datei geladen
+        let usedWordIndices = new Set(); // Speichert die Indizes der bereits verwendeten Wörter
+
+        const STORAGE_KEY_SETTINGS = 'imposterGameSettings';
+        const STORAGE_KEY_PLAYERS = 'imposterGamePlayers';
+        const STORAGE_KEY_USED_WORDS = 'imposterUsedWords'; // Neuer Schlüssel für verwendete Wörter
+
+        let gameState = {
+            playerCount: 4,
+            imposterCount: 1,
+            showTips: true,
+            players: [],
+            roles: [],
+            currentWord: '',
+            currentTip: '',
+            currentPlayerIndex: 0,
+            eliminatedPlayers: [],
+            imposterIndices: [],
+            gamePhase: 'setup',
+            roundsPlayed: 0
+        };
+
+        const setupContainer = document.querySelector('.setup-container');
+        const playerInputContainer = document.querySelector('.player-input-container');
+        const gameContainer = document.querySelector('.game-container');
+        const roleRevealContainer = document.querySelector('.role-reveal-container');
+        const votingContainer = document.querySelector('.voting-container');
+        const resultContainer = document.querySelector('.result-container');
+
+        const playerCountInput = document.getElementById('player-count');
+        const imposterCountInput = document.getElementById('imposter-count');
+        const showTipsCheckbox = document.getElementById('show-tips');
+        const confirmSettingsButton = document.getElementById('confirm-settings');
+        const resetSettingsButton = document.getElementById('reset-settings-button');
+
+        const playerNameInput = document.getElementById('player-name');
+        const addPlayerButton = document.getElementById('add-player');
+        const playerList = document.getElementById('player-list');
+        const startGameButton = document.getElementById('start-game');
+
+        const currentPlayerDisplay = document.getElementById('current-player-name');
+        const roleCard = document.getElementById('role-card');
+        const nextPlayerButton = document.getElementById('next-player');
+
+        const startingPlayerDisplay = document.getElementById('starting-player');
+        const startVotingButton = document.getElementById('start-voting');
+
+        const votingList = document.getElementById('voting-list');
+
+        const resultMessage = document.getElementById('result-message');
+        const gameStatusInfo = document.getElementById('game-status-info');
+        const continueGameButton = document.getElementById('continue-game');
+
+        const newGameButton = document.getElementById('new-game-button');
+        const restartGameAfterResultButton = document.getElementById('restart-game-after-result');
+
+        const playerStatus = document.getElementById('player-status');
+        const remainingPlayersDisplay = document.getElementById('remaining-players');
+
+        // Custom Dialog Elements
+        const customDialogOverlay = document.getElementById('custom-dialog-overlay');
+        const dialogTitle = document.getElementById('dialog-title');
+        const dialogMessage = document.getElementById('dialog-message');
+        const dialogCancelButton = document.getElementById('dialog-cancel-button');
+        const dialogConfirmButton = document.getElementById('dialog-confirm-button');
+
+        let resolveDialogPromise; // To hold the promise resolver for the custom dialog
+
+        /**
+         * Shows a custom confirmation dialog.
+         * @param {string} title - The title of the dialog.
+         * @param {string} message - The message content.
+         * @param {string} confirmText - Text for the confirm button.
+         * @param {string} cancelText - Text for the cancel button.
+         * @param {boolean} isDangerConfirm - If true, the confirm button will be red (for destructive actions).
+         * @returns {Promise<boolean>} - Resolves with true if confirmed, false if cancelled.
+         */
+        function showCustomConfirm(title, message, confirmText = 'Bestätigen', cancelText = 'Abbrechen', isDangerConfirm = false) {
+            dialogTitle.textContent = title;
+            dialogMessage.textContent = message;
+            dialogConfirmButton.textContent = confirmText;
+            dialogCancelButton.textContent = cancelText;
+
+            dialogConfirmButton.classList.toggle('danger-confirm', isDangerConfirm);
+
+            customDialogOverlay.classList.add('show');
+
+            return new Promise(resolve => {
+                resolveDialogPromise = resolve;
+
+                const handleConfirm = () => {
+                    customDialogOverlay.classList.remove('show');
+                    dialogConfirmButton.removeEventListener('click', handleConfirm);
+                    dialogCancelButton.removeEventListener('click', handleCancel);
+                    resolve(true);
+                };
+
+                const handleCancel = () => {
+                    customDialogOverlay.classList.remove('show');
+                    dialogConfirmButton.removeEventListener('click', handleConfirm);
+                    dialogCancelButton.removeEventListener('click', handleCancel);
+                    resolve(false);
+                };
+
+                dialogConfirmButton.addEventListener('click', handleConfirm);
+                dialogCancelButton.addEventListener('click', handleCancel);
+            });
+        }
+
+        // Funktion zum Laden der Wörter aus der externen Datei
+        async function loadWordPairs() {
+            try {
+                const response = await fetch('words.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                wordPairs = await response.json();
+                console.log('Wörter erfolgreich geladen:', wordPairs);
+            } catch (error) {
+                console.error('Fehler beim Laden der Wörter:', error);
+                // Use custom dialog for alert
+                showCustomConfirm('Fehler!', 'Fehler beim Laden der Wörter. Bitte stelle sicher, dass die Datei "words.json" im selben Verzeichnis existiert und korrekt formatiert ist.', 'OK', '', false).then(() => {});
+            }
+        }
+
+        // Speichern der bereits verwendeten Wort-Indizes
+        function saveUsedWords() {
+            localStorage.setItem(STORAGE_KEY_USED_WORDS, JSON.stringify(Array.from(usedWordIndices)));
+        }
+
+        // Laden der bereits verwendeten Wort-Indizes
+        function loadUsedWords() {
+            const savedUsedWords = localStorage.getItem(STORAGE_KEY_USED_WORDS);
+            if (savedUsedWords) {
+                usedWordIndices = new Set(JSON.parse(savedUsedWords));
+            } else {
+                usedWordIndices = new Set();
+            }
+        }
+
+        function saveSettings() {
+            const settingsToSave = {
+                playerCount: gameState.playerCount,
+                imposterCount: gameState.imposterCount,
+                showTips: gameState.showTips
+            };
+            localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settingsToSave));
+        }
+
+        function loadSettings() {
+            const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                gameState.playerCount = settings.playerCount;
+                gameState.imposterCount = settings.imposterCount;
+                gameState.showTips = settings.showTips;
+
+                playerCountInput.value = gameState.playerCount;
+                imposterCountInput.value = gameState.imposterCount;
+                showTipsCheckbox.checked = gameState.showTips;
+            } else {
+                playerCountInput.value = gameState.playerCount;
+                imposterCountInput.value = gameState.imposterCount;
+                showTipsCheckbox.checked = gameState.showTips;
+            }
+        }
+
+        function savePlayers() {
+            localStorage.setItem(STORAGE_KEY_PLAYERS, JSON.stringify(gameState.players));
+        }
+
+        function loadPlayers() {
+            const savedPlayers = localStorage.getItem(STORAGE_KEY_PLAYERS);
+            if (savedPlayers) {
+                const players = JSON.parse(savedPlayers);
+                gameState.players = players.slice(0, gameState.playerCount); // Ensure current player count limit
+                updatePlayerList();
+                updateRemainingPlayersDisplay();
+            } else {
+                gameState.players = [];
+                updatePlayerList();
+                updateRemainingPlayersDisplay();
+            }
+        }
+
+        confirmSettingsButton.addEventListener('click', confirmSettings);
+        addPlayerButton.addEventListener('click', addPlayer);
+        playerNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addPlayer();
+        });
+        startGameButton.addEventListener('click', startGame);
+        roleCard.addEventListener('click', revealRole);
+        nextPlayerButton.addEventListener('click', nextPlayer);
+        startVotingButton.addEventListener('click', startVoting);
+        continueGameButton.addEventListener('click', continueGame);
+
+        newGameButton.addEventListener('click', () => {
+            showCustomConfirm('Neues Spiel starten?', 'Möchtest du wirklich ein neues Spiel starten? Alle aktuellen Spielinformationen gehen verloren.', 'Neues Spiel', 'Abbrechen').then(confirmed => {
+                if (confirmed) {
+                    resetGame();
+                }
+            });
+        });
+
+        resetSettingsButton.addEventListener('click', () => {
+            showCustomConfirm('Einstellungen zurücksetzen?', 'Möchtest du wirklich alle Einstellungen und Spielerdaten zurücksetzen? Dies kann nicht rückgängig gemacht werden.', 'Alles zurücksetzen', 'Abbrechen', true).then(confirmed => {
+                if (confirmed) {
+                    resetAllSettings();
+                }
+            });
+        });
+        
+        restartGameAfterResultButton.addEventListener('click', () => {
+             showCustomConfirm('Neues Spiel starten?', 'Möchtest du wirklich ein neues Spiel starten? Alle aktuellen Spielinformationen gehen verloren.', 'Neues Spiel', 'Abbrechen').then(confirmed => {
+                if (confirmed) {
+                    resetGame();
+                }
+            });
+        });
+
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadWordPairs(); // Wörter beim Laden der Seite laden
+            loadSettings();
+            loadPlayers();
+            loadUsedWords(); // Verwendete Wörter laden
+            startGameButton.disabled = gameState.players.length !== gameState.playerCount;
+        });
+
+        function confirmSettings() {
+            const playerCount = parseInt(playerCountInput.value);
+            const imposterCount = parseInt(imposterCountInput.value);
+
+            if (isNaN(playerCount) || playerCount < 3 || playerCount > 20) {
+                showCustomConfirm('Fehler', 'Die Spieleranzahl muss zwischen 3 und 20 liegen.', 'OK', '', false);
+                return;
+            }
+
+            if (isNaN(imposterCount) || imposterCount < 1 || imposterCount >= playerCount) {
+                showCustomConfirm('Fehler', 'Die Anzahl der Imposter muss mindestens 1 und kleiner als die Spieleranzahl sein.', 'OK', '', false);
+                return;
+            }
+
+            gameState.playerCount = playerCount;
+            gameState.imposterCount = imposterCount;
+            gameState.showTips = showTipsCheckbox.checked;
+
+            saveSettings();
+            
+            // Trim players if player count was reduced
+            if (gameState.players.length > gameState.playerCount) {
+                gameState.players = gameState.players.slice(0, gameState.playerCount);
+                savePlayers();
+            }
+            updatePlayerList();
+            updateRemainingPlayersDisplay();
+
+            setupContainer.classList.remove('active');
+            playerInputContainer.classList.add('active');
+            gameState.gamePhase = 'playerInput';
+        }
+
+        function addPlayer() {
+            const playerName = playerNameInput.value.trim();
+
+            if (!playerName) {
+                showCustomConfirm('Eingabefehler', 'Bitte gib einen Spielernamen ein.', 'OK', '', false);
+                return;
+            }
+
+            if (gameState.players.includes(playerName)) {
+                showCustomConfirm('Eingabefehler', 'Dieser Spielername existiert bereits.', 'OK', '', false);
+                return;
+            }
+            
+            if (gameState.players.length >= gameState.playerCount) {
+                showCustomConfirm('Spielerlimit erreicht', `Du hast bereits die maximale Anzahl von ${gameState.playerCount} Spielern hinzugefügt.`, 'OK', '', false);
+                return;
+            }
+
+            gameState.players.push(playerName);
+            savePlayers();
+            updatePlayerList();
+            playerNameInput.value = '';
+            playerNameInput.focus();
+            updateRemainingPlayersDisplay();
+
+            if (gameState.players.length === gameState.playerCount) {
+                startGameButton.disabled = false;
+            }
+        }
+
+        function removePlayer(indexToRemove) {
+            gameState.players.splice(indexToRemove, 1);
+            savePlayers();
+            updatePlayerList();
+            updateRemainingPlayersDisplay();
+            startGameButton.disabled = gameState.players.length !== gameState.playerCount;
+        }
+
+        function updatePlayerList() {
+            playerList.innerHTML = '';
+            gameState.players.forEach((player, index) => {
+                const playerItem = document.createElement('div');
+                playerItem.classList.add('player-item');
+
+                const playerName = document.createElement('span');
+                playerName.textContent = player;
+
+                const removeButton = document.createElement('button');
+                removeButton.classList.add('remove-player');
+                removeButton.textContent = 'X';
+                removeButton.addEventListener('click', () => removePlayer(index));
+
+                playerItem.appendChild(playerName);
+                playerItem.appendChild(removeButton);
+                playerList.appendChild(playerItem);
+            });
+            startGameButton.disabled = gameState.players.length !== gameState.playerCount;
+        }
+
+        function updateRemainingPlayersDisplay() {
+            const remaining = gameState.playerCount - gameState.players.length;
+            if (remaining === 0) {
+                playerStatus.innerHTML = '<p>Alle Spieler hinzugefügt! Du kannst das Spiel jetzt starten.</p>';
+            } else {
+                remainingPlayersDisplay.textContent = remaining === 1 ?
+                    "noch 1 Spieler" :
+                    `noch ${remaining} Spieler`;
+                playerStatus.innerHTML = `<p>Bitte füge <span id="remaining-players">${remainingPlayersDisplay.textContent}</span> hinzu.</p>`;
+            }
+        }
+
+        function startGame() {
+            if (gameState.players.length !== gameState.playerCount) {
+                showCustomConfirm('Fehler', `Bitte füge genau ${gameState.playerCount} Spieler hinzu.`, 'OK', '', false);
+                return;
+            }
+            if (wordPairs.length === 0) {
+                showCustomConfirm('Fehler', 'Wörter konnten nicht geladen werden. Bitte versuche es erneut oder überprüfe die "words.json" Datei.', 'OK', '', false);
+                return;
+            }
+
+            assignRoles();
+
+            playerInputContainer.classList.remove('active');
+            gameContainer.classList.add('active');
+            gameState.gamePhase = 'roleDistribution';
+
+            gameState.currentPlayerIndex = 0;
+            currentPlayerDisplay.textContent = gameState.players[0];
+            roleCard.classList.add('role-hidden');
+            roleCard.innerHTML = '<p>Klicke hier, um deine Rolle zu sehen</p>';
+        }
+
+        function assignRoles() {
+            let availableWordIndices = [];
+            for (let i = 0; i < wordPairs.length; i++) {
+                if (!usedWordIndices.has(i)) {
+                    availableWordIndices.push(i);
+                }
+            }
+
+            // Wenn alle Wörter verwendet wurden, setze die Liste der verwendeten Wörter zurück
+            if (availableWordIndices.length === 0) {
+                usedWordIndices.clear();
+                saveUsedWords(); // Speichern, dass die Liste zurückgesetzt wurde
+                console.log('Alle Wörter wurden verwendet. Die Liste der verwendeten Wörter wurde zurückgesetzt.');
+                // Fülle availableWordIndices neu
+                for (let i = 0; i < wordPairs.length; i++) {
+                    availableWordIndices.push(i);
+                }
+            }
+
+            const randomWordIndex = availableWordIndices[Math.floor(Math.random() * availableWordIndices.length)];
+            const wordPair = wordPairs[randomWordIndex];
+
+            gameState.currentWord = wordPair.word;
+            gameState.currentTip = wordPair.tip;
+            usedWordIndices.add(randomWordIndex); // Füge den Index zu den verwendeten hinzu
+            saveUsedWords(); // Speichere die aktualisierte Liste
+
+            gameState.roles = Array(gameState.players.length).fill('normal');
+
+            gameState.imposterIndices = [];
+            while (gameState.imposterIndices.length < gameState.imposterCount) {
+                const index = Math.floor(Math.random() * gameState.players.length);
+                if (!gameState.imposterIndices.includes(index)) {
+                    gameState.imposterIndices.push(index);
+                    gameState.roles[index] = 'imposter';
+                }
+            }
+        }
+
+        function revealRole() {
+            if (roleCard.classList.contains('role-hidden')) {
+                roleCard.classList.remove('role-hidden');
+
+                const currentPlayerRole = gameState.roles[gameState.currentPlayerIndex];
+
+                if (currentPlayerRole === 'imposter') {
+                    let content = '<h3>Du bist der IMPOSTER!</h3>';
+
+                    if (gameState.showTips) {
+                        content += `<p>Tipp: ${gameState.currentTip}</p>`;
+                    }
+
+                    roleCard.innerHTML = content;
+                } else {
+                    roleCard.innerHTML = `
+                        <h3>Dein Wort:</h3>
+                        <p style="font-size: 24px; font-weight: bold; margin: 15px 0;">${gameState.currentWord}</p>
+                    `;
+                }
+            }
+        }
+
+        function nextPlayer() {
+            roleCard.classList.add('role-hidden');
+            roleCard.innerHTML = '<p>Klicke hier, um deine Rolle zu sehen</p>';
+
+            gameState.currentPlayerIndex++;
+
+            if (gameState.currentPlayerIndex >= gameState.players.length) {
+                startDiscussion();
+                return;
+            }
+
+            currentPlayerDisplay.textContent = gameState.players[gameState.currentPlayerIndex];
+        }
+
+        function startDiscussion() {
+            gameContainer.classList.remove('active');
+            roleRevealContainer.classList.add('active');
+            gameState.gamePhase = 'discussion';
+
+            const availablePlayers = gameState.players.filter((_, index) =>
+                !gameState.eliminatedPlayers.includes(index)
+            );
+            const randomPlayer = availablePlayers[Math.floor(Math.random() * availablePlayers.length)];
+            startingPlayerDisplay.textContent = randomPlayer;
+        }
+
+        function startVoting() {
+            roleRevealContainer.classList.remove('active');
+            votingContainer.classList.add('active');
+            gameState.gamePhase = 'voting';
+
+            updateVotingList();
+        }
+
+        function updateVotingList() {
+            votingList.innerHTML = '';
+            gameState.players.forEach((player, index) => {
+                if (gameState.eliminatedPlayers.includes(index)) {
+                    return;
+                }
+
+                const votingItem = document.createElement('div');
+                votingItem.classList.add('voting-item');
+                votingItem.textContent = player;
+                votingItem.addEventListener('click', () => {
+                    showCustomConfirm('Spieler eliminieren?', `Möchtest du ${player} wirklich eliminieren?`, 'Ja, eliminieren', 'Abbrechen', true).then(confirmed => {
+                        if (confirmed) {
+                            eliminatePlayer(index);
+                        }
+                    });
+                });
+
+                votingList.appendChild(votingItem);
+            });
+        }
+
+        function eliminatePlayer(index) {
+            gameState.eliminatedPlayers.push(index);
+
+            votingContainer.classList.remove('active');
+            resultContainer.classList.add('active');
+            gameState.gamePhase = 'result';
+
+            const playerName = gameState.players[index];
+            const isImposter = gameState.roles[index] === 'imposter';
+
+            resultMessage.innerHTML = `
+                <p>${playerName} wurde eliminiert!</p>
+                <p>Rolle: ${isImposter ? 'IMPOSTER!' : 'Normaler Spieler'}</p>
+            `;
+
+            checkGameStatus();
+        }
+
+        function checkGameStatus() {
+            const remainingImposters = gameState.imposterIndices.filter(
+                index => !gameState.eliminatedPlayers.includes(index)
+            ).length;
+
+            const remainingPlayers = gameState.players.length - gameState.eliminatedPlayers.length;
+
+            if (remainingImposters === 0) {
+                gameStatusInfo.innerHTML = `
+                    <h3>Spiel beendet!</h3>
+                    <p>Alle Imposter wurden gefunden. Die normalen Spieler gewinnen!</p>
+                `;
+                continueGameButton.style.display = 'none';
+                restartGameAfterResultButton.style.display = 'block';
+            } else if (remainingPlayers - remainingImposters <= remainingImposters) {
+                gameStatusInfo.innerHTML = `
+                    <h3>Spiel beendet!</h3>
+                    <p>Die Imposter sind zu mächtig! Die Imposter gewinnen!</p>
+                `;
+                continueGameButton.style.display = 'none';
+                restartGameAfterResultButton.style.display = 'block';
+                restartGameAfterResultButton.classList.add('large-button');
+            } else {
+                gameStatusInfo.innerHTML = `
+                    <h3>Spielstatus:</h3>
+                    <p>Verbleibende Spieler: ${remainingPlayers}</p>
+                    <p>Verbleibende Imposter: ${remainingImposters}</p>
+                `;
+                continueGameButton.style.display = 'block';
+                restartGameAfterResultButton.style.display = 'none';
+            }
+        }
+
+        function continueGame() {
+            resultContainer.classList.remove('active');
+            roleRevealContainer.classList.add('active');
+            gameState.gamePhase = 'discussion';
+
+            restartGameAfterResultButton.style.display = 'none';
+            restartGameAfterResultButton.classList.remove('large-button');
+            
+            startDiscussion();
+        }
+
+        function resetGame() {
+            loadSettings();
+            loadPlayers();
+            // usedWordIndices wird hier bewusst NICHT zurückgesetzt,
+            // damit die Wörter über mehrere Spiele hinweg gemerkt werden.
+            // Nur wenn alle Wörter durch sind, wird die Liste geleert (in assignRoles).
+            
+            gameState.roles = [];
+            gameState.currentWord = '';
+            gameState.currentTip = '';
+            gameState.currentPlayerIndex = 0;
+            gameState.eliminatedPlayers = [];
+            gameState.imposterIndices = [];
+            gameState.gamePhase = 'setup';
+            gameState.roundsPlayed = 0;
+
+            setupContainer.classList.add('active');
+            playerInputContainer.classList.remove('active');
+            gameContainer.classList.remove('active');
+            roleRevealContainer.classList.remove('active');
+            votingContainer.classList.remove('active');
+            resultContainer.classList.remove('active');
+
+            votingList.innerHTML = '';
+            
+            startGameButton.disabled = gameState.players.length !== gameState.playerCount;
+            updateRemainingPlayersDisplay();
+
+            restartGameAfterResultButton.style.display = 'none';
+            restartGameAfterResultButton.classList.remove('large-button');
+        }
+
+        function resetAllSettings() {
+            localStorage.removeItem(STORAGE_KEY_SETTINGS);
+            localStorage.removeItem(STORAGE_KEY_PLAYERS);
+            localStorage.removeItem(STORAGE_KEY_USED_WORDS); // Auch verwendete Wörter zurücksetzen
+
+            gameState = {
+                playerCount: 4,
+                imposterCount: 1,
+                showTips: true,
+                players: [],
+                roles: [],
+                currentWord: '',
+                currentTip: '',
+                currentPlayerIndex: 0,
+                eliminatedPlayers: [],
+                imposterIndices: [],
+                gamePhase: 'setup',
+                roundsPlayed: 0
+            };
+            usedWordIndices.clear(); // Auch im Speicher löschen
+
+            playerCountInput.value = gameState.playerCount;
+            imposterCountInput.value = gameState.imposterCount;
+            showTipsCheckbox.checked = gameState.showTips;
+            
+            playerList.innerHTML = '';
+            votingList.innerHTML = '';
+
+            updateRemainingPlayersDisplay();
+            startGameButton.disabled = true;
+
+            setupContainer.classList.add('active');
+            playerInputContainer.classList.remove('active');
+            gameContainer.classList.remove('active');
+            roleRevealContainer.classList.remove('active');
+            votingContainer.classList.remove('active');
+            resultContainer.classList.remove('active');
+
+            restartGameAfterResultButton.style.display = 'none';
+            restartGameAfterResultButton.classList.remove('large-button');
+
+            // Optionally, show a confirmation that settings were reset
+            showCustomConfirm('Einstellungen zurückgesetzt', 'Alle Einstellungen und Spielerdaten wurden erfolgreich zurückgesetzt.', 'OK', '', false);
+        }
+    </script>
 </body>
 </html>
