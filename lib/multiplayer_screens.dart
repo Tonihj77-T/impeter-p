@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'dart:math';
 import 'main.dart';
 import 'multiplayer_service.dart';
@@ -105,7 +104,11 @@ class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => _scanQRCode(),
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('QR-Scanner nicht verfügbar')),
+                                );
+                              },
                               icon: const Icon(Icons.qr_code_scanner),
                               label: const Text('QR scannen'),
                             ),
@@ -244,19 +247,6 @@ class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen> {
     );
   }
 
-  void _scanQRCode() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => QRScannerScreen(
-          onCodeScanned: (code) {
-            _lobbyCodeController.text = code;
-            Navigator.pop(context);
-          },
-        ),
-      ),
-    );
-  }
 
   @override
   void dispose() {
@@ -266,60 +256,6 @@ class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen> {
   }
 }
 
-class QRScannerScreen extends StatefulWidget {
-  final Function(String) onCodeScanned;
-
-  const QRScannerScreen({super.key, required this.onCodeScanned});
-
-  @override
-  _QRScannerScreenState createState() => _QRScannerScreenState();
-}
-
-class _QRScannerScreenState extends State<QRScannerScreen> {
-  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
-  QRViewController? controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('QR-Code scannen'),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            flex: 5,
-            child: QRView(
-              key: qrKey,
-              onQRViewCreated: _onQRViewCreated,
-            ),
-          ),
-          const Expanded(
-            flex: 1,
-            child: Center(
-              child: Text('Richte die Kamera auf den QR-Code'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _onQRViewCreated(QRViewController controller) {
-    this.controller = controller;
-    controller.scannedDataStream.listen((scanData) {
-      if (scanData.code != null) {
-        widget.onCodeScanned(scanData.code!);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    controller?.dispose();
-    super.dispose();
-  }
-}
 
 class LobbyScreen extends StatefulWidget {
   final String lobbyId;

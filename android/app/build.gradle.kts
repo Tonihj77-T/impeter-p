@@ -1,3 +1,6 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -43,12 +46,8 @@ flutter {
     source = "../.."
 }
 
-import java.io.File
-import java.util.Properties
-
-val localProperties = Properties().apply {
-    file("../local.properties").inputStream().use { load(it) }
-}
+val localProperties = Properties()
+rootProject.file("local.properties").inputStream().use { localProperties.load(it) }
 val flutterSdkPath: String = localProperties.getProperty("flutter.sdk")
 val engineVersion: String = File("$flutterSdkPath/bin/cache/engine.stamp").readText().trim()
 

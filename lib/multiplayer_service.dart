@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 
 class MultiplayerService extends ChangeNotifier {
@@ -57,11 +56,6 @@ class MultiplayerService extends ChangeNotifier {
   Future<void> _checkAndConnect() async {
     if (_isConnected || _isConnecting) return;
     
-    final connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult == ConnectivityResult.none) {
-      return;
-    }
-
     await _connectToServer();
   }
 
