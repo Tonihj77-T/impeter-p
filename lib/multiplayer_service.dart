@@ -134,14 +134,14 @@ class MultiplayerService extends ChangeNotifier {
     });
 
     _socket!.on('player_ready_changed', (data) {
-      final player = _lobbyPlayers.firstWhere(
-        (p) => p.socketId == data['socketId'],
-        orElse: () => MultiplayerPlayer.empty(),
-      );
-      if (player.socketId.isNotEmpty) {
-        player.isReady = data['ready'];
-        notifyListeners();
+      // Find player and update ready status
+      for (var player in _lobbyPlayers) {
+        if (player.socketId == data['socketId']) {
+          player.isReady = data['ready'];
+          break;
+        }
       }
+      notifyListeners();
       onPlayerReadyChanged?.call(data['socketId'], data['ready']);
     });
 

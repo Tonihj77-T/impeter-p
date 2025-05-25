@@ -72,10 +72,10 @@ class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen> {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () => _createLobby(),
-                          icon: const Icon(Icons.add),
-                          label: const Text('Lobby erstellen'),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Lobby erstellen', style: TextStyle(fontSize: 15)),
                           style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
                       ),
@@ -97,20 +97,22 @@ class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen> {
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () => _joinLobby(),
-                              icon: const Icon(Icons.login),
-                              label: const Text('Beitreten'),
+                              icon: const Icon(Icons.login, size: 16),
+                              label: const Text('Beitreten', style: TextStyle(fontSize: 14)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('QR-Scanner nicht verfügbar')),
-                                );
-                              },
-                              icon: const Icon(Icons.qr_code_scanner),
-                              label: const Text('QR scannen'),
+                              onPressed: () => _scanQRCode(),
+                              icon: const Icon(Icons.qr_code_scanner, size: 16),
+                              label: const Text('QR Code', style: TextStyle(fontSize: 14)),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                              ),
                             ),
                           ),
                         ],
@@ -247,6 +249,19 @@ class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen> {
     );
   }
 
+  void _scanQRCode() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QRScannerScreen(
+          onCodeScanned: (code) {
+            _lobbyCodeController.text = code;
+            Navigator.pop(context);
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -256,6 +271,88 @@ class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen> {
   }
 }
 
+class QRScannerScreen extends StatefulWidget {
+  final Function(String) onCodeScanned;
+
+  const QRScannerScreen({super.key, required this.onCodeScanned});
+
+  @override
+  _QRScannerScreenState createState() => _QRScannerScreenState();
+}
+
+class _QRScannerScreenState extends State<QRScannerScreen> {
+  final _codeController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Lobby-Code eingeben'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.qr_code_scanner,
+              size: 80,
+              color: Colors.deepPurple,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'QR-Scanner momentan nicht verfügbar',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Bitte gib den Lobby-Code manuell ein:',
+              style: TextStyle(fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            TextField(
+              controller: _codeController,
+              decoration: const InputDecoration(
+                labelText: 'Lobby-Code',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.vpn_key),
+              ),
+              textCapitalization: TextCapitalization.characters,
+              autofocus: true,
+              onSubmitted: (value) => _submitCode(),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _submitCode,
+                icon: const Icon(Icons.check),
+                label: const Text('Code übernehmen'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submitCode() {
+    if (_codeController.text.trim().isNotEmpty) {
+      widget.onCodeScanned(_codeController.text.trim().toUpperCase());
+    }
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+}
 
 class LobbyScreen extends StatefulWidget {
   final String lobbyId;
@@ -390,8 +487,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             
                             return Container(
                               margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
+                                horizontal: 12,
+                                vertical: 3,
                               ),
                               child: Row(
                                 mainAxisAlignment: isOwnMessage
@@ -400,17 +497,17 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                 children: [
                                   Container(
                                     constraints: BoxConstraints(
-                                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                      maxWidth: MediaQuery.of(context).size.width * 0.75,
                                     ),
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
+                                      horizontal: 10,
+                                      vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
                                       color: isOwnMessage
                                           ? Colors.deepPurple
                                           : Colors.grey.shade300,
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,7 +516,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                           Text(
                                             message.playerName,
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 11,
                                               fontWeight: FontWeight.bold,
                                               color: Colors.grey.shade600,
                                             ),
@@ -427,6 +524,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                         Text(
                                           message.message,
                                           style: TextStyle(
+                                            fontSize: 14,
                                             color: isOwnMessage
                                                 ? Colors.white
                                                 : Colors.black,
@@ -445,7 +543,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                   const Divider(height: 1),
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
                         Expanded(
@@ -454,17 +552,20 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             decoration: const InputDecoration(
                               hintText: 'Nachricht eingeben...',
                               border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
+                            style: const TextStyle(fontSize: 14),
                             onSubmitted: (_) => _sendMessage(),
                           ),
                         ),
                         const SizedBox(width: 8),
                         IconButton(
                           onPressed: _sendMessage,
-                          icon: const Icon(Icons.send),
+                          icon: const Icon(Icons.send, size: 18),
                           style: IconButton.styleFrom(
                             backgroundColor: Colors.deepPurple,
                             foregroundColor: Colors.white,
+                            padding: const EdgeInsets.all(10),
                           ),
                         ),
                       ],
@@ -478,7 +579,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
           // Ready button
           if (!widget.isHost)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -488,12 +589,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     });
                     _multiplayerService.setPlayerReady(_isReady);
                   },
-                  icon: Icon(_isReady ? Icons.check : Icons.schedule),
-                  label: Text(_isReady ? 'Bereit!' : 'Bereit machen'),
+                  icon: Icon(_isReady ? Icons.check : Icons.schedule, size: 18),
+                  label: Text(
+                    _isReady ? 'Bereit!' : 'Bereit machen',
+                    style: const TextStyle(fontSize: 15),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isReady ? Colors.green : null,
                     foregroundColor: _isReady ? Colors.white : null,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ),
@@ -502,7 +606,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
           // Start game button (host only)
           if (widget.isHost)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: AnimatedBuilder(
                 animation: _multiplayerService,
                 builder: (context, child) {
@@ -515,12 +619,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: canStart ? _startGame : null,
-                      icon: const Icon(Icons.play_arrow),
-                      label: Text(canStart 
-                          ? 'Spiel starten' 
-                          : 'Warte auf Spieler (min. 3)'),
+                      icon: const Icon(Icons.play_arrow, size: 18),
+                      label: Text(
+                        canStart 
+                            ? 'Spiel starten' 
+                            : 'Warte auf Spieler (min. 3)',
+                        style: const TextStyle(fontSize: 15),
+                        textAlign: TextAlign.center,
+                      ),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                         backgroundColor: canStart ? Colors.green : null,
                         foregroundColor: canStart ? Colors.white : null,
                       ),
@@ -767,8 +875,8 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                             
                             return Container(
                               margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
+                                horizontal: 12,
+                                vertical: 3,
                               ),
                               child: Row(
                                 mainAxisAlignment: isOwnMessage
@@ -777,17 +885,17 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                                 children: [
                                   Container(
                                     constraints: BoxConstraints(
-                                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                      maxWidth: MediaQuery.of(context).size.width * 0.75,
                                     ),
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
+                                      horizontal: 10,
+                                      vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
                                       color: isOwnMessage
                                           ? Colors.deepPurple
                                           : Colors.grey.shade300,
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -796,7 +904,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                                           Text(
                                             message.playerName,
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 11,
                                               fontWeight: FontWeight.bold,
                                               color: Colors.grey.shade600,
                                             ),
@@ -804,6 +912,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                                         Text(
                                           message.message,
                                           style: TextStyle(
+                                            fontSize: 14,
                                             color: isOwnMessage
                                                 ? Colors.white
                                                 : Colors.black,
