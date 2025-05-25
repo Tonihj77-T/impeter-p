@@ -169,10 +169,10 @@ Impeter/
 - ✅ Fortsetzung nach Elimination
 - ✅ Dark Mode
 - ✅ Mobile und Web-Version identisch
+- ✅ Timer für Diskussionsrunden
 
 ### Geplante Verbesserungen:
 - 🔄 Mehr Wort-Kategorien
-- 🔄 Timer für Diskussionsrunden
 - 🔄 Spielstatistiken
 - 🔄 Custom Word Pakete
 
