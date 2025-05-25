@@ -31,6 +31,215 @@
   <title>Impeter Game</title>
   <link rel="manifest" href="manifest.json">
 
+  <style>
+    .app-banner {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, #000000 0%, #333333 100%);
+      color: white;
+      padding: 10px 20px;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.2);
+      z-index: 9999;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      animation: slideDown 0.3s ease-out;
+    }
+    
+    .app-banner.show {
+      display: flex;
+    }
+    
+    .banner-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      gap: 20px;
+    }
+    
+    .banner-text {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+    }
+    
+    .banner-icon {
+      width: 36px;
+      height: 36px;
+      background: white;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .banner-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    
+    .banner-info {
+      text-align: left;
+    }
+    
+    .banner-info h3 {
+      margin: 0 0 1px 0;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    
+    .banner-info p {
+      margin: 0;
+      font-size: 13px;
+      opacity: 0.85;
+      line-height: 1.2;
+    }
+    
+    .banner-actions {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+    
+    .download-btn {
+      background: #dc2626;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 18px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    
+    .download-btn:hover {
+      background: #b91c1c;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 26px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
+      padding: 6px;
+      line-height: 1;
+      min-width: 32px;
+      text-align: center;
+    }
+    
+    .close-btn:hover {
+      opacity: 1;
+    }
+    
+    @keyframes slideDown {
+      from {
+        transform: translateY(-100%);
+      }
+      to {
+        transform: translateY(0);
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .app-banner {
+        padding: 8px 16px;
+      }
+      
+      .banner-content {
+        gap: 12px;
+        justify-content: space-between;
+      }
+      
+      .banner-text {
+        gap: 10px;
+        flex: 1;
+      }
+      
+      .banner-icon {
+        width: 32px;
+        height: 32px;
+        padding: 3px;
+      }
+      
+      .banner-info h3 {
+        font-size: 14px;
+      }
+      
+      .banner-info p {
+        font-size: 12px;
+      }
+      
+      .download-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+      
+      .close-btn {
+        font-size: 22px;
+        min-width: 26px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .app-banner {
+        padding: 6px 12px;
+      }
+      
+      .banner-content {
+        gap: 8px;
+        justify-content: space-between;
+      }
+      
+      .banner-text {
+        gap: 8px;
+        flex: 1;
+      }
+      
+      .banner-icon {
+        width: 28px;
+        height: 28px;
+        padding: 2px;
+      }
+      
+      .banner-info h3 {
+        font-size: 13px;
+      }
+      
+      .banner-info p {
+        font-size: 11px;
+      }
+      
+      .download-btn {
+        padding: 5px 10px;
+        font-size: 11px;
+      }
+      
+      .close-btn {
+        font-size: 20px;
+        min-width: 24px;
+        padding: 2px;
+      }
+    }
+  </style>
+
   <script>
     // The value below is injected by flutter build, do not touch.
     const serviceWorkerVersion = null;
@@ -39,8 +248,69 @@
   <script src="flutter.js" defer></script>
 </head>
 <body>
+  <!-- App Download Banner -->
+  <div id="app-banner" class="app-banner">
+    <div class="banner-content">
+      <div class="banner-text">
+        <div class="banner-icon">
+          <img src="logo.svg" alt="Impeter Logo">
+        </div>
+        <div class="banner-info">
+          <h3>Impeter Game</h3>
+          <p>Play offline with our Android app</p>
+        </div>
+      </div>
+      <div class="banner-actions">
+        <a href="#" id="download-apk" class="download-btn">Download APK</a>
+        <button id="close-banner" class="close-btn">&times;</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // Android detection and banner functionality
+    function isAndroid() {
+      return /Android/i.test(navigator.userAgent);
+    }
+    
+    function showAppBanner() {
+      const banner = document.getElementById('app-banner');
+      const closeBanner = document.getElementById('close-banner');
+      const downloadBtn = document.getElementById('download-apk');
+      
+      // Check if banner was previously dismissed
+      if (localStorage.getItem('app-banner-dismissed') === 'true') {
+        return;
+      }
+      
+      // Show banner only on Android devices
+      if (isAndroid()) {
+        banner.classList.add('show');
+        
+        // Add margin to body to prevent content overlap
+        document.body.style.paddingTop = banner.offsetHeight + 'px';
+        
+        // Close banner functionality
+        closeBanner.addEventListener('click', function() {
+          banner.classList.remove('show');
+          document.body.style.paddingTop = '0';
+          localStorage.setItem('app-banner-dismissed', 'true');
+        });
+        
+        // Download APK functionality
+        // Replace with your actual APK download URL
+        downloadBtn.href = 'app-release.apk';
+        downloadBtn.addEventListener('click', function(e) {
+          // You can add analytics tracking here
+          console.log('APK download initiated');
+        });
+      }
+    }
+    
     window.addEventListener('load', function(ev) {
+      // Show app banner for Android devices
+      showAppBanner();
+      
       // Download main.dart.js
       _flutter.loader.loadEntrypoint({
         serviceWorker: {

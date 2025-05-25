@@ -1416,8 +1416,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             end: Alignment.bottomCenter,
             colors: _isCardFlipped
                 ? (player.isImpeter
-                    ? [Colors.red.shade100, Colors.red.shade50]
-                    : [Colors.green.shade100, Colors.green.shade50])
+                    ? [Colors.red.shade100.withOpacity(0.4), Colors.red.shade50.withOpacity(0.3)]
+                    : [Colors.green.shade100.withOpacity(0.4), Colors.green.shade50.withOpacity(0.3)])
                 : [Colors.deepPurple.shade100, Colors.deepPurple.shade50],
           ),
         ),
