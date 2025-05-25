@@ -3,10 +3,13 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
+import 'multiplayer_service.dart';
+import 'multiplayer_screens.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await WordDatabase.loadWords();
+  MultiplayerService().initialize();
   runApp(const ImpeterApp());
 }
 
@@ -560,6 +563,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     icon: const Icon(Icons.settings),
                     label: Text(texts['settings']!),
+                  ),
+                  const SizedBox(height: 16),
+                  _AnimatedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      SlidePageRoute(child: const MultiplayerMenuScreen()),
+                    ),
+                    icon: const Icon(Icons.people),
+                    label: const Text('Mehrspieler'),
                   ),
                   const SizedBox(height: 16),
                   _AnimatedButton(

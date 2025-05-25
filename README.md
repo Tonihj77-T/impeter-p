@@ -88,6 +88,52 @@ flutter run -d chrome  # Für Web
 flutter run             # Für Android (Gerät angeschlossen)
 ```
 
+### Multiplayer-Server (Lobby-System)
+
+Der Node.js-Server stellt das Lobby-System für Mehrspielerpartien bereit. Er ermöglicht das Erstellen und Betreten von Lobbys, Ready-State, Chat, Spielstart, Wort- und Abstimmungsrunden.
+
+#### Voraussetzungen
+
+- Node.js 16+ und npm
+- (Optional) nodemon für automatische Neustarts in der Entwicklung
+
+#### Installation und Start
+
+```bash
+cd server
+npm install
+# Production
+npm start
+# Development mit automatischem Neustart
+npm run dev
+```
+
+Der Server lauscht standardmäßig auf Port 3000. Über die Umgebungsvariable `PORT` kann der Port angepasst werden.
+
+#### HTTP-Endpunkte
+
+| Methode | Pfad        | Beschreibung                                   |
+| ------- | ----------- | ---------------------------------------------- |
+| GET     | /health     | Healthcheck, zeigt Status und Anzahl Lobbys an |
+| GET     | /lobby/:id  | Informationen zu einer Lobby abrufen           |
+
+#### Socket.IO-Ereignisse
+
+- `create_lobby` – Lobby erstellen (data: { hostName })
+- `lobby_created` – Rückmeldung zur Lobby-Erstellung (data: { lobbyId, lobby })
+- `join_lobby` – Lobby beitreten (data: { lobbyId, playerName })
+- `player_joined` – Benachrichtigung über neuen Spieler
+- `player_ready` – Ready-/Unready-Status setzen (data: { lobbyId, ready })
+- `player_ready_changed` – Ready-Status geändert (data: { socketId, ready, allReady })
+- `start_game` – Spiel starten (data: { lobbyId, gameSettings })
+- `game_started` – Spiel hat begonnen
+- `chat_message` – Chatnachricht senden (data: { lobbyId, message })
+- `word_submitted` – Wort für aktuellen Zug übermitteln (data: { lobbyId, word })
+- `submit_vote` – Stimme abgeben (data: { lobbyId, vote })
+- `vote_received` – Zwischenfeedback zur Abstimmung (data: { votesCount, totalPlayers })
+- `vote_results` – Abstimmungsergebnis (data: { results })
+- `player_left` – Spieler hat Lobby verlassen
+
 ## 📂 Projektstruktur
 
 ```
@@ -101,6 +147,7 @@ Impeter/
 │   ├── web/               # Gebaute Web-Version
 │   └── app/outputs/       # Gebaute Android APK
 ├── android/               # Android-spezifische Dateien
+├── server/                # Node.js Multiplayer-Server (Lobby-System)
 ├── assets/
 │   └── words.json         # Wort-Datenbank für mobile App
 └── README.md
