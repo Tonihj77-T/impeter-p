@@ -118,40 +118,49 @@ class MultiplayerService extends ChangeNotifier {
 
     // Lobby events
     _socket!.on('lobby_created', (data) {
+      print('Lobby created: ${data['lobbyId']}');
       _currentLobbyId = data['lobbyId'];
       _updateLobbyState(data['lobby']);
       onLobbyCreated?.call(data['lobbyId']);
     });
 
     _socket!.on('player_joined', (data) {
+      print('Player joined: ${data['player']['name']}');
       _updateLobbyState(data['lobby']);
       onPlayerJoined?.call(MultiplayerPlayer.fromJson(data['player']));
     });
 
     _socket!.on('player_left', (data) {
+      print('Player left: ${data['socketId']}');
       _updateLobbyState(data['lobby']);
       onPlayerLeft?.call(data['socketId']);
     });
 
     _socket!.on('player_ready_changed', (data) {
+      print('Player ready changed: ${data['socketId']} -> ${data['ready']}');
       // Find player and update ready status
+      bool found = false;
       for (var player in _lobbyPlayers) {
         if (player.socketId == data['socketId']) {
           player.isReady = data['ready'];
+          found = true;
           break;
         }
       }
+      print('Player found and updated: $found');
       notifyListeners();
       onPlayerReadyChanged?.call(data['socketId'], data['ready']);
     });
 
     _socket!.on('game_started', (data) {
+      print('Game started');
       _gameState = 'playing';
       notifyListeners();
       onGameStarted?.call();
     });
 
     _socket!.on('chat_message', (data) {
+      print('Chat message received: ${data['message']}');
       final message = ChatMessage.fromJson(data);
       _chatMessages.add(message);
       notifyListeners();
@@ -176,10 +185,12 @@ class MultiplayerService extends ChangeNotifier {
   }
 
   void _updateLobbyState(Map<String, dynamic> lobbyData) {
+    print('Updating lobby state: ${lobbyData['players'].length} players');
     _lobbyPlayers = (lobbyData['players'] as List)
         .map((p) => MultiplayerPlayer.fromJson(p))
         .toList();
     _gameState = lobbyData['gameState'];
+    print('Players in lobby: ${_lobbyPlayers.map((p) => '${p.name}(${p.isReady ? "ready" : "not ready"})').join(", ")}');
     notifyListeners();
   }
 
@@ -205,6 +216,7 @@ class MultiplayerService extends ChangeNotifier {
       }
     }
 
+    _currentLobbyId = lobbyId;
     _socket!.emit('join_lobby', {
       'lobbyId': lobbyId,
       'playerName': playerName
@@ -212,11 +224,15 @@ class MultiplayerService extends ChangeNotifier {
   }
 
   void setPlayerReady(bool ready) {
+    print('Setting player ready: $ready, connected: $_isConnected, lobbyId: $_currentLobbyId');
     if (_isConnected && _currentLobbyId != null) {
       _socket!.emit('player_ready', {
         'lobbyId': _currentLobbyId,
         'ready': ready
       });
+      print('Emitted player_ready event');
+    } else {
+      print('Cannot set ready - not connected or no lobby');
     }
   }
 
@@ -230,11 +246,15 @@ class MultiplayerService extends ChangeNotifier {
   }
 
   void sendChatMessage(String message) {
+    print('Sending chat message: $message, connected: $_isConnected, lobbyId: $_currentLobbyId');
     if (_isConnected && _currentLobbyId != null) {
       _socket!.emit('chat_message', {
         'lobbyId': _currentLobbyId,
         'message': message
       });
+      print('Emitted chat_message event');
+    } else {
+      print('Cannot send message - not connected or no lobby');
     }
   }
 

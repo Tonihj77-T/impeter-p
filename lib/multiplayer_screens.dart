@@ -15,11 +15,13 @@ class MultiplayerMenuScreen extends StatefulWidget {
 class _MultiplayerMenuScreenState extends State<MultiplayerMenuScreen> {
   final _nameController = TextEditingController();
   final _lobbyCodeController = TextEditingController();
-  final _multiplayerService = MultiplayerService();
+  late final MultiplayerService _multiplayerService;
 
   @override
   void initState() {
     super.initState();
+    _multiplayerService = MultiplayerService();
+    _multiplayerService.initialize();
     _multiplayerService.onError = (message) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
@@ -371,7 +373,7 @@ class LobbyScreen extends StatefulWidget {
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
-  final _multiplayerService = MultiplayerService();
+  late final MultiplayerService _multiplayerService;
   final _chatController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isReady = false;
@@ -380,6 +382,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   @override
   void initState() {
     super.initState();
+    _multiplayerService = MultiplayerService();
     _setupListeners();
   }
 
@@ -771,7 +774,7 @@ class MultiplayerGameScreen extends StatefulWidget {
 }
 
 class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
-  final _multiplayerService = MultiplayerService();
+  late final MultiplayerService _multiplayerService;
   final _wordController = TextEditingController();
   final _chatController = TextEditingController();
   String _currentTurnPlayer = '';
@@ -780,6 +783,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   @override
   void initState() {
     super.initState();
+    _multiplayerService = MultiplayerService();
     _setupGameListeners();
   }
 
