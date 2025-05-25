@@ -777,8 +777,19 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   late final MultiplayerService _multiplayerService;
   final _wordController = TextEditingController();
   final _chatController = TextEditingController();
+  final _scrollController = ScrollController();
+  
   String _currentTurnPlayer = '';
+  int _currentTurnIndex = 0;
   bool _isMyTurn = false;
+  bool _chatVisible = false;
+  
+  // Game state
+  String? _myWord;
+  String? _myTip;
+  bool _isImposter = false;
+  List<String> _submittedWords = [];
+  Map<String, dynamic>? _gameSettings;
 
   @override
   void initState() {
@@ -788,15 +799,23 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
   }
 
   void _setupGameListeners() {
+    _multiplayerService.onGameDataReceived = (gameData) {
+      setState(() {
+        _myWord = gameData['word'];
+        _myTip = gameData['tip'];
+        _isImposter = gameData['isImposter'] ?? false;
+        _currentTurnIndex = gameData['currentTurn'] ?? 0;
+        _currentTurnPlayer = gameData['currentPlayer'] ?? '';
+        _isMyTurn = _currentTurnPlayer == widget.playerName;
+      });
+    };
+    
     _multiplayerService.onWordSubmitted = (playerName, word, nextPlayerName) {
       setState(() {
+        _submittedWords.add('$playerName: $word');
         _currentTurnPlayer = nextPlayerName;
         _isMyTurn = nextPlayerName == widget.playerName;
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$playerName hat "$word" eingegeben')),
-      );
     };
 
     _multiplayerService.onVoteResults = (results) {
@@ -805,7 +824,22 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
 
     _multiplayerService.onChatMessage = (message) {
       setState(() {});
+      if (_chatVisible) {
+        _scrollToBottom();
+      }
     };
+  }
+  
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
@@ -816,66 +850,189 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
         centerTitle: true,
         automaticallyImplyLeading: false,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Game status
-          Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    _isMyTurn ? 'Du bist dran!' : '$_currentTurnPlayer ist dran',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Column(
+            children: [
+              // Role/Word Display
+              Card(
+                margin: const EdgeInsets.all(16),
+                color: _isImposter ? Colors.red.shade50 : Colors.green.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Text(
+                        _isImposter ? '🎭 Du bist IMPOSTER' : '✅ Du bist NORMALER SPIELER',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _isImposter ? Colors.red.shade700 : Colors.green.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_isImposter && _myTip != null) ...[
+                        Text(
+                          'Dein Hinweis:',
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _myTip!,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                      ] else if (!_isImposter && _myWord != null) ...[
+                        Text(
+                          'Dein Wort:',
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _myWord!,
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ],
                   ),
-                  if (_isMyTurn) ...[
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _wordController,
-                      decoration: const InputDecoration(
-                        labelText: 'Dein Wort eingeben',
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _submitWord(),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _submitWord,
-                        child: const Text('Wort abgeben'),
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
-            ),
+              
+              // Turn Status
+              Card(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(
+                        _isMyTurn ? '🎯 Du bist dran!' : '⏳ $_currentTurnPlayer ist dran',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      if (_isMyTurn) ...[
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _wordController,
+                          decoration: const InputDecoration(
+                            labelText: 'Dein Wort eingeben',
+                            border: OutlineInputBorder(),
+                            hintText: 'Beschreibe das Wort...',
+                          ),
+                          onSubmitted: (_) => _submitWord(),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _submitWord,
+                            icon: const Icon(Icons.send, size: 18),
+                            label: const Text('Wort abgeben'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              backgroundColor: Colors.deepPurple,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Submitted Words History
+              Expanded(
+                child: Card(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          '📝 Eingereichte Wörter',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: _submittedWords.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Noch keine Wörter eingereicht',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _submittedWords.length,
+                              itemBuilder: (context, index) {
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.deepPurple,
+                                    child: Text('${index + 1}'),
+                                  ),
+                                  title: Text(_submittedWords[index]),
+                                );
+                              },
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           
-          // Chat
-          Expanded(
-            child: Card(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Chat',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: AnimatedBuilder(
-                      animation: _multiplayerService,
-                      builder: (context, child) {
-                        return ListView.builder(
-                          itemCount: _multiplayerService.chatMessages.length,
-                          itemBuilder: (context, index) {
-                            final message = _multiplayerService.chatMessages[index];
-                            final isOwnMessage = message.playerName == widget.playerName;
+          // Collapsible Chat Overlay
+          if (_chatVisible)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 60,
+              top: MediaQuery.of(context).size.height * 0.4,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                child: Card(
+                  margin: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.deepPurple,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            topRight: Radius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Text(
+                              '💬 Chat',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: () => setState(() => _chatVisible = false),
+                              icon: const Icon(Icons.close, color: Colors.white),
+                              iconSize: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: AnimatedBuilder(
+                          animation: _multiplayerService,
+                          builder: (context, child) {
+                            return ListView.builder(
+                              controller: _scrollController,
+                              itemCount: _multiplayerService.chatMessages.length,
+                              itemBuilder: (context, index) {
+                                final message = _multiplayerService.chatMessages[index];
+                                final isOwnMessage = message.playerName == widget.playerName;
                             
                             return Container(
                               margin: const EdgeInsets.symmetric(
@@ -959,8 +1116,23 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                         ),
                       ],
                     ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ),
+            ),
+          
+          // Chat Toggle Button
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              onPressed: () => setState(() => _chatVisible = !_chatVisible),
+              backgroundColor: Colors.deepPurple,
+              child: Icon(
+                _chatVisible ? Icons.chat_bubble : Icons.chat_bubble_outline,
+                color: Colors.white,
               ),
             ),
           ),

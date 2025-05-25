@@ -37,6 +37,7 @@ class MultiplayerService extends ChangeNotifier {
   Function(String socketId)? onPlayerLeft;
   Function(String socketId, bool ready)? onPlayerReadyChanged;
   Function()? onGameStarted;
+  Function(Map<String, dynamic> gameData)? onGameDataReceived;
   Function(ChatMessage message)? onChatMessage;
   Function(String playerName, String word, String nextPlayerName)? onWordSubmitted;
   Function(Map<String, dynamic> results)? onVoteResults;
@@ -153,10 +154,15 @@ class MultiplayerService extends ChangeNotifier {
     });
 
     _socket!.on('game_started', (data) {
-      print('Game started');
+      print('Game started with data: $data');
       _gameState = 'playing';
       notifyListeners();
       onGameStarted?.call();
+      
+      // Store game data for the current player
+      if (onGameDataReceived != null) {
+        onGameDataReceived!(data);
+      }
     });
 
     _socket!.on('chat_message', (data) {

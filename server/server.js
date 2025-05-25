@@ -3,6 +3,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +20,23 @@ app.use(express.json());
 
 // Store active lobbies
 const lobbies = new Map();
+
+// Load words from JSON file
+let wordsData = {};
+try {
+  const wordsPath = path.join(__dirname, '..', 'assets', 'words.json');
+  wordsData = JSON.parse(fs.readFileSync(wordsPath, 'utf8'));
+} catch (error) {
+  console.error('Could not load words.json:', error);
+  // Fallback words
+  wordsData = {
+    "places": [
+      {"word": "Italien", "tip": "Stiefel"},
+      {"word": "Paris", "tip": "Licht"},
+      {"word": "Sahara", "tip": "Sand"}
+    ]
+  };
+}
 
 // Lobby structure
 class Lobby {
@@ -71,6 +90,77 @@ class Lobby {
 
   allPlayersReady() {
     return this.players.length >= 3 && this.players.every(p => p.isReady || p.isHost);
+  }
+
+  startGame(gameSettings) {
+    this.gameState = 'playing';
+    this.gameData = gameSettings;
+    this.currentTurn = 0;
+    
+    // Select random word
+    const categories = Object.keys(wordsData);
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    const words = wordsData[randomCategory];
+    const selectedWord = words[Math.floor(Math.random() * words.length)];
+    
+    this.currentWord = selectedWord.word;
+    this.wordTip = selectedWord.tip;
+    
+    // Determine imposters
+    const imposterCount = Math.min(gameSettings.impeterCount || 1, Math.floor(this.players.length / 3));
+    const imposterIndices = [];
+    while (imposterIndices.length < imposterCount) {
+      const randomIndex = Math.floor(Math.random() * this.players.length);
+      if (!imposterIndices.includes(randomIndex)) {
+        imposterIndices.push(randomIndex);
+      }
+    }
+    
+    // Assign roles
+    this.players.forEach((player, index) => {
+      player.isImposter = imposterIndices.includes(index);
+      player.word = player.isImposter ? null : this.currentWord;
+      player.tip = player.isImposter ? this.wordTip : null;
+    });
+    
+    return {
+      word: this.currentWord,
+      tip: this.wordTip,
+      players: this.players.map(p => ({
+        socketId: p.socketId,
+        name: p.name,
+        isImposter: p.isImposter,
+        word: p.word,
+        tip: p.tip
+      })),
+      currentTurn: this.currentTurn,
+      currentPlayer: this.players[this.currentTurn].name
+    };
+  }
+
+  submitWord(socketId, word) {
+    const playerIndex = this.players.findIndex(p => p.socketId === socketId);
+    if (playerIndex !== this.currentTurn) {
+      return null; // Not player's turn
+    }
+    
+    this.submittedWords = this.submittedWords || [];
+    this.submittedWords.push({
+      playerName: this.players[playerIndex].name,
+      word: word,
+      timestamp: Date.now()
+    });
+    
+    // Move to next turn
+    this.currentTurn = (this.currentTurn + 1) % this.players.length;
+    
+    return {
+      playerName: this.players[playerIndex].name,
+      word: word,
+      nextTurn: this.currentTurn,
+      nextPlayer: this.players[this.currentTurn].name,
+      allWords: this.submittedWords
+    };
   }
 }
 
@@ -161,13 +251,29 @@ io.on('connection', (socket) => {
   socket.on('start_game', (data) => {
     const lobby = lobbies.get(data.lobbyId);
     if (lobby && lobby.hostSocketId === socket.id && lobby.allPlayersReady()) {
-      lobby.gameState = 'playing';
-      lobby.currentTurn = 0;
-      lobby.gameData = data.gameSettings;
+      const gameData = lobby.startGame(data.gameSettings);
       
-      io.to(data.lobbyId).emit('game_started', {
-        gameData: lobby.gameData,
-        players: lobby.players
+      // Send individual game data to each player
+      lobby.players.forEach(player => {
+        socket.to(player.socketId).emit('game_started', {
+          word: player.word,
+          tip: player.tip,
+          isImposter: player.isImposter,
+          currentTurn: gameData.currentTurn,
+          currentPlayer: gameData.currentPlayer,
+          allPlayers: lobby.players.map(p => ({ name: p.name, socketId: p.socketId }))
+        });
+      });
+      
+      // Send to host as well
+      const hostPlayer = lobby.players.find(p => p.socketId === socket.id);
+      socket.emit('game_started', {
+        word: hostPlayer.word,
+        tip: hostPlayer.tip,
+        isImposter: hostPlayer.isImposter,
+        currentTurn: gameData.currentTurn,
+        currentPlayer: gameData.currentPlayer,
+        allPlayers: lobby.players.map(p => ({ name: p.name, socketId: p.socketId }))
       });
       
       console.log(`Game started in lobby: ${data.lobbyId}`);
@@ -197,18 +303,14 @@ io.on('connection', (socket) => {
   socket.on('submit_word', (data) => {
     const lobby = lobbies.get(data.lobbyId);
     if (lobby && lobby.gameState === 'playing') {
-      const currentPlayerIndex = lobby.currentTurn % lobby.players.length;
-      const currentPlayer = lobby.players[currentPlayerIndex];
-      
-      if (currentPlayer.socketId === socket.id) {
-        // Valid turn, broadcast the word
-        lobby.currentTurn++;
-        
+      const result = lobby.submitWord(socket.id, data.word);
+      if (result) {
         io.to(data.lobbyId).emit('word_submitted', {
-          playerName: currentPlayer.name,
-          word: data.word,
-          nextTurn: lobby.currentTurn % lobby.players.length,
-          nextPlayerName: lobby.players[lobby.currentTurn % lobby.players.length].name
+          playerName: result.playerName,
+          word: result.word,
+          nextTurn: result.nextTurn,
+          nextPlayer: result.nextPlayer,
+          allWords: result.allWords
         });
       }
     }
