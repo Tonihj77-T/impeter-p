@@ -71,7 +71,7 @@ Ein spannendes Gesellschaftsspiel für 3-30 Spieler, bei dem ein oder mehrere Im
 ### Entwicklung
 ```bash
 # Repository klonen
-git clone <repository-url>
+git clone https://github.com/Tonihj77-T/Impeter.git
 cd Impeter
 
 # Flutter Dependencies installieren
@@ -169,10 +169,10 @@ Impeter/
 - ✅ Fortsetzung nach Elimination
 - ✅ Dark Mode
 - ✅ Mobile und Web-Version identisch
+- ✅ Timer für Diskussionsrunden
 
 ### Geplante Verbesserungen:
 - 🔄 Mehr Wort-Kategorien
-- 🔄 Timer für Diskussionsrunden
 - 🔄 Spielstatistiken
 - 🔄 Custom Word Pakete
 
