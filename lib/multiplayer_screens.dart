@@ -911,6 +911,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
 
   void _setupGameListeners() {
     _multiplayerService.onGameDataReceived = (gameData) {
+      print('Raw game data received: $gameData');
       setState(() {
         _myWord = gameData['word'];
         _myTip = gameData['tip'];
@@ -918,16 +919,19 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
         _currentTurnIndex = gameData['currentTurn'] ?? 0;
         _currentTurnPlayer = gameData['currentPlayer'] ?? '';
         _isMyTurn = _currentTurnPlayer == widget.playerName;
+        _gameSettings = gameData;
       });
-      print('Game data received: word=$_myWord, tip=$_myTip, isImposter=$_isImposter, currentPlayer=$_currentTurnPlayer, isMyTurn=$_isMyTurn');
+      print('Game data processed: word=$_myWord, tip=$_myTip, isImposter=$_isImposter, currentPlayer=$_currentTurnPlayer, isMyTurn=$_isMyTurn');
     };
     
     _multiplayerService.onWordSubmitted = (playerName, word, nextPlayerName) {
+      print('Word submitted: $playerName said "$word", next player: $nextPlayerName');
       setState(() {
         _submittedWords.add('$playerName: $word');
         _currentTurnPlayer = nextPlayerName;
         _isMyTurn = nextPlayerName == widget.playerName;
       });
+      print('Updated turn state: currentPlayer=$_currentTurnPlayer, isMyTurn=$_isMyTurn');
     };
 
     _multiplayerService.onVoteResults = (results) {
@@ -1021,7 +1025,9 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                           ? '🎯 Du bist dran!' 
                           : _currentTurnPlayer.isNotEmpty 
                             ? '⏳ $_currentTurnPlayer ist dran'
-                            : '⏳ Warte auf Spieler...',
+                            : (_myWord != null || _myTip != null) 
+                              ? '⏳ Spiel lädt...'
+                              : '⏳ Warte auf Spieler...',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       if (_isMyTurn) ...[

@@ -265,27 +265,26 @@ io.on('connection', (socket) => {
     if (lobby && lobby.hostSocketId === socket.id && lobby.allPlayersReady()) {
       const gameData = lobby.startGame(data.gameSettings);
       
-      // Send individual game data to each player
+      // Send individual game data to each player including the host
       lobby.players.forEach(player => {
-        socket.to(player.socketId).emit('game_started', {
+        const playerGameData = {
           word: player.word,
           tip: player.tip,
           isImposter: player.isImposter,
           currentTurn: gameData.currentTurn,
           currentPlayer: gameData.currentPlayer,
           allPlayers: lobby.players.map(p => ({ name: p.name, socketId: p.socketId }))
-        });
-      });
-      
-      // Send to host as well
-      const hostPlayer = lobby.players.find(p => p.socketId === socket.id);
-      socket.emit('game_started', {
-        word: hostPlayer.word,
-        tip: hostPlayer.tip,
-        isImposter: hostPlayer.isImposter,
-        currentTurn: gameData.currentTurn,
-        currentPlayer: gameData.currentPlayer,
-        allPlayers: lobby.players.map(p => ({ name: p.name, socketId: p.socketId }))
+        };
+        
+        if (player.socketId === socket.id) {
+          // Send to host (current socket)
+          socket.emit('game_started', playerGameData);
+        } else {
+          // Send to other players
+          socket.to(player.socketId).emit('game_started', playerGameData);
+        }
+        
+        console.log(`Sent game data to ${player.name}: isImposter=${player.isImposter}, word=${player.word}, tip=${player.tip}`);
       });
       
       console.log(`Game started in lobby: ${data.lobbyId}`);
@@ -321,9 +320,10 @@ io.on('connection', (socket) => {
           playerName: result.playerName,
           word: result.word,
           nextTurn: result.nextTurn,
-          nextPlayer: result.nextPlayer,
+          nextPlayerName: result.nextPlayer,
           allWords: result.allWords
         });
+        console.log(`Word submitted by ${result.playerName}: "${result.word}", next player: ${result.nextPlayer}`);
       }
     }
   });

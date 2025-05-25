@@ -154,15 +154,18 @@ class MultiplayerService extends ChangeNotifier {
     });
 
     _socket!.on('game_started', (data) {
-      print('Game started with data: $data');
+      print('Game started with full data: $data');
       _gameState = 'playing';
       notifyListeners();
-      onGameStarted?.call();
       
-      // Store game data for the current player
+      // Store game data for the current player first
       if (onGameDataReceived != null) {
+        print('Calling onGameDataReceived with: $data');
         onGameDataReceived!(data);
       }
+      
+      // Then call game started to potentially navigate
+      onGameStarted?.call();
     });
 
     _socket!.on('chat_message', (data) {
