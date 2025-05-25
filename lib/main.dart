@@ -371,7 +371,7 @@ const Map<String, String> germanTexts = {
   'startRound': 'Spiel starten',
   'roleReveal': 'Rolle enthüllen',
   'youAreImpeter': 'Du bist der Impeter!',
-  'youAreNot': 'Du bist kein Impeter. Wort:',
+  'youAreNot': 'Wort:',
   'next': 'Weiter',
   'discussion': 'Diskussion',
   'vote': 'Abstimmung',
