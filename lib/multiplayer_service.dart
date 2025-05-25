@@ -174,10 +174,11 @@ class MultiplayerService extends ChangeNotifier {
     });
 
     _socket!.on('word_submitted', (data) {
+      print('Word submitted event: $data');
       onWordSubmitted?.call(
         data['playerName'], 
         data['word'], 
-        data['nextPlayerName']
+        data['nextPlayer'] ?? data['nextPlayerName'] ?? ''
       );
     });
 

@@ -93,6 +93,7 @@ class Lobby {
   }
 
   startGame(gameSettings) {
+    console.log('Starting game with settings:', gameSettings);
     this.gameState = 'playing';
     this.gameData = gameSettings;
     this.currentTurn = 0;
@@ -105,22 +106,33 @@ class Lobby {
     
     this.currentWord = selectedWord.word;
     this.wordTip = selectedWord.tip;
+    console.log('Selected word:', this.currentWord, 'tip:', this.wordTip);
     
     // Determine imposters
-    const imposterCount = Math.min(gameSettings.impeterCount || 1, Math.floor(this.players.length / 3));
+    const requestedImposterCount = gameSettings.impeterCount || gameSettings.imposterCount || 1;
+    const maxImposters = Math.max(1, Math.floor(this.players.length / 3));
+    const imposterCount = Math.min(requestedImposterCount, maxImposters);
+    console.log('Player count:', this.players.length, 'Requested imposters:', requestedImposterCount, 'Final imposter count:', imposterCount);
+    
+    // Ensure we have at least 1 imposter
+    const actualImposterCount = Math.max(1, imposterCount);
+    
     const imposterIndices = [];
-    while (imposterIndices.length < imposterCount) {
+    while (imposterIndices.length < actualImposterCount) {
       const randomIndex = Math.floor(Math.random() * this.players.length);
       if (!imposterIndices.includes(randomIndex)) {
         imposterIndices.push(randomIndex);
       }
     }
+    console.log('Selected imposter indices:', imposterIndices);
     
     // Assign roles
     this.players.forEach((player, index) => {
-      player.isImposter = imposterIndices.includes(index);
-      player.word = player.isImposter ? null : this.currentWord;
-      player.tip = player.isImposter ? this.wordTip : null;
+      const isImposter = imposterIndices.includes(index);
+      player.isImposter = isImposter;
+      player.word = isImposter ? null : this.currentWord;
+      player.tip = isImposter ? this.wordTip : null;
+      console.log(`Player ${player.name} (index ${index}): isImposter=${isImposter}, word=${player.word}, tip=${player.tip}`);
     });
     
     return {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'dart:math';
+import 'dart:math' as Math;
 import 'main.dart';
 import 'multiplayer_service.dart';
 
@@ -378,6 +378,12 @@ class _LobbyScreenState extends State<LobbyScreen> {
   final _scrollController = ScrollController();
   bool _isReady = false;
   bool _showQR = false;
+  bool _showSettings = false;
+  
+  // Game Settings für Host
+  int _impeterCount = 1;
+  int _timerMinutes = 5;
+  bool _showTips = true;
 
   @override
   void initState() {
@@ -442,6 +448,15 @@ class _LobbyScreenState extends State<LobbyScreen> {
         title: Text('Lobby: ${widget.lobbyId}'),
         centerTitle: true,
         actions: [
+          if (widget.isHost)
+            IconButton(
+              icon: Icon(_showSettings ? Icons.close : Icons.settings),
+              onPressed: () {
+                setState(() {
+                  _showSettings = !_showSettings;
+                });
+              },
+            ),
           IconButton(
             icon: Icon(_showQR ? Icons.people : Icons.qr_code),
             onPressed: () {
@@ -459,7 +474,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
             margin: const EdgeInsets.all(16),
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: _showQR ? _buildQRCode() : _buildPlayerList(),
+              child: _showSettings && widget.isHost 
+                ? _buildSettings() 
+                : (_showQR ? _buildQRCode() : _buildPlayerList()),
             ),
           ),
           
@@ -737,17 +754,111 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
   }
 
+  Widget _buildSettings() {
+    final playerCount = _multiplayerService.lobbyPlayers.length;
+    final maxImpeters = Math.max(1, (playerCount / 3).floor());
+    
+    // Ensure current impeter count is valid
+    if (_impeterCount > maxImpeters) {
+      _impeterCount = maxImpeters;
+    }
+    
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '⚙️ Spiel-Einstellungen',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          
+          // Impeter Anzahl - Kompakter
+          Row(
+            children: [
+              const Text('Impeter: '),
+              Expanded(
+                child: Slider(
+                  value: _impeterCount.toDouble(),
+                  min: 1,
+                  max: Math.max(1, maxImpeters).toDouble(),
+                  divisions: Math.max(1, maxImpeters - 1),
+                  label: '$_impeterCount',
+                  onChanged: (value) {
+                    setState(() {
+                      _impeterCount = value.round();
+                    });
+                  },
+                ),
+              ),
+              Text('$_impeterCount'),
+            ],
+          ),
+          
+          // Timer - Kompakter
+          Row(
+            children: [
+              const Text('Zeit: '),
+              Expanded(
+                child: Slider(
+                  value: _timerMinutes.toDouble(),
+                  min: 1,
+                  max: 10,
+                  divisions: 9,
+                  label: '$_timerMinutes min',
+                  onChanged: (value) {
+                    setState(() {
+                      _timerMinutes = value.round();
+                    });
+                  },
+                ),
+              ),
+              Text('${_timerMinutes}min'),
+            ],
+          ),
+          
+          // Tips anzeigen - Kompakter
+          CheckboxListTile(
+            title: const Text('Tipps für Impeter'),
+            subtitle: const Text('Hinweise anzeigen'),
+            value: _showTips,
+            onChanged: (value) {
+              setState(() {
+                _showTips = value ?? true;
+              });
+            },
+            dense: true,
+          ),
+          
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Spieler: $playerCount | Max. Impeter: $maxImpeters',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _startGame() {
     final gameSettings = {
       'playerCount': _multiplayerService.lobbyPlayers.length,
-      'impeterCount': GameSettings.instance.impeterCount,
-      'roundCount': GameSettings.instance.roundCount,
-      'timerMinutes': GameSettings.instance.timerMinutes,
-      'gameMode': GameSettings.instance.gameMode.toString(),
-      'customWords': GameSettings.instance.customWords,
-      'showTips': GameSettings.instance.showTips,
+      'impeterCount': _impeterCount,
+      'roundCount': 1,
+      'timerMinutes': _timerMinutes,
+      'gameMode': 'normal',
+      'customWords': [],
+      'showTips': _showTips,
     };
     
+    print('Starting game with settings: $gameSettings');
     _multiplayerService.startGame(gameSettings);
   }
 
@@ -808,6 +919,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
         _currentTurnPlayer = gameData['currentPlayer'] ?? '';
         _isMyTurn = _currentTurnPlayer == widget.playerName;
       });
+      print('Game data received: word=$_myWord, tip=$_myTip, isImposter=$_isImposter, currentPlayer=$_currentTurnPlayer, isMyTurn=$_isMyTurn');
     };
     
     _multiplayerService.onWordSubmitted = (playerName, word, nextPlayerName) {
@@ -905,7 +1017,11 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                   child: Column(
                     children: [
                       Text(
-                        _isMyTurn ? '🎯 Du bist dran!' : '⏳ $_currentTurnPlayer ist dran',
+                        _isMyTurn 
+                          ? '🎯 Du bist dran!' 
+                          : _currentTurnPlayer.isNotEmpty 
+                            ? '⏳ $_currentTurnPlayer ist dran'
+                            : '⏳ Warte auf Spieler...',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       if (_isMyTurn) ...[
