@@ -42,3 +42,18 @@ android {
 flutter {
     source = "../.."
 }
+
+import java.io.File
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    file("../local.properties").inputStream().use { load(it) }
+}
+val flutterSdkPath: String = localProperties.getProperty("flutter.sdk")
+val engineVersion: String = File("$flutterSdkPath/bin/cache/engine.stamp").readText().trim()
+
+dependencies {
+    debugImplementation("io.flutter:flutter_embedding_debug:1.0.0-$engineVersion")
+    profileImplementation("io.flutter:flutter_embedding_profile:1.0.0-$engineVersion")
+    releaseImplementation("io.flutter:flutter_embedding_release:1.0.0-$engineVersion")
+}
